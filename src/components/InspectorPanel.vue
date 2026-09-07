@@ -11,11 +11,20 @@ import {
   Settings2,
   Trash2,
 } from '@lucide/vue'
-import type { SelectedNode } from '@/editor/types'
+import type { SelectedNode } from '../editor/types'
+import type { TableCommand, TableContext } from '../editor/table'
+import { normalizeFontSize } from '../editor/font-size'
+import { normalizeImageLayout } from '../editor/image-layout'
+import ImageFilePicker from './ImageFilePicker.vue'
 
 const props = defineProps<{
   selected: SelectedNode | null
+  table: TableContext | null
+  readonly?: boolean
   topLevelCount: number
+  canUpload?: boolean
+  uploading?: boolean
+  canPairNextImage?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -23,7 +32,9 @@ const emit = defineEmits<{
   move: [direction: -1 | 1]
   duplicate: []
   remove: []
-  tableCommand: [command: string]
+  tableCommand: [command: TableCommand]
+  uploadImage: [files: File[]]
+  pairImages: []
 }>()
 
 const names: Record<string, string> = {
@@ -44,6 +55,14 @@ const names: Record<string, string> = {
 
 const type = computed(() => props.selected?.node.type.name ?? '')
 const attrs = computed<Record<string, unknown>>(() => props.selected?.node.attrs ?? {})
+const presetFontSizes = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96]
+const fontSizeOptions = computed(() => {
+  const current = normalizeFontSize(attrs.value.fontSize)
+  // Keep older documents' non-preset sizes visible without rewriting their JSON.
+  return current !== null && !presetFontSizes.includes(current)
+    ? [...presetFontSizes, current].sort((a, b) => a - b)
+    : presetFontSizes
+})
 const isTopLevel = computed(() => (props.selected?.depth ?? 2) <= 1)
 const canMoveUp = computed(() => (props.selected?.topLevelIndex ?? -1) > 0)
 const canMoveDown = computed(() => {
@@ -63,6 +82,16 @@ function optionalTextPatch(key: string, event: Event) {
 function numberPatch(key: string, event: Event) {
   const value = (event.target as HTMLInputElement).value
   emit('patch', { [key]: value === '' ? null : Number(value) })
+}
+
+function fontSizePatch(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  if (value === '') {
+    emit('patch', { fontSize: null })
+    return
+  }
+  const size = normalizeFontSize(Number(value))
+  if (size !== null) emit('patch', { fontSize: size })
 }
 
 function selectPatch(key: string, event: Event) {
@@ -103,6 +132,18 @@ function setButtonStyle(event: Event) {
         <code>{{ type }}</code>
       </div>
 
+      <section v-if="table" class="property-section table-structure">
+        <h3>表格结构</h3>
+        <p class="table-size" aria-live="polite">{{ table.rows }} 行 × {{ table.columns }} 列</p>
+        <div class="table-actions" @mousedown.prevent>
+          <button type="button" :disabled="readonly" title="在当前行下方添加一行" @click="emit('tableCommand', 'addRowAfter')">添加行</button>
+          <button type="button" :disabled="readonly" title="在当前列右侧添加一列" @click="emit('tableCommand', 'addColumnAfter')">添加列</button>
+          <button type="button" :disabled="readonly || !table.canDeleteRow" title="删除选中的行，至少保留一行" @click="emit('tableCommand', 'deleteRow')">删除行</button>
+          <button type="button" :disabled="readonly || !table.canDeleteColumn" title="删除选中的列，至少保留一列" @click="emit('tableCommand', 'deleteColumn')">删除列</button>
+        </div>
+        <p class="table-help">点击单元格后操作对应行列；选中整表时操作末行、末列。</p>
+      </section>
+
       <section v-if="type === 'heading'" class="property-section">
         <h3>标题设置</h3>
         <label class="field-label">
@@ -111,6 +152,25 @@ function setButtonStyle(event: Event) {
             <option v-for="level in 6" :key="level" :value="level">H{{ level }}</option>
           </select>
         </label>
+      </section>
+
+      <section v-if="type === 'paragraph'" class="property-section property-help">
+        <h3>正文设置</h3>
+        <div class="field-row">
+          <label class="field-label">
+            <span>字体大小 px</span>
+            <select
+              :value="attrs.fontSize ?? ''"
+              aria-label="正文字体大小"
+              @change="fontSizePatch"
+            >
+              <option value="">默认字号</option>
+              <option v-for="size in fontSizeOptions" :key="size" :value="size">{{ size }} px</option>
+            </select>
+          </label>
+          <button class="action-button ghost font-size-reset" type="button" :disabled="attrs.fontSize == null" @click="emit('patch', { fontSize: null })">恢复默认字号</button>
+        </div>
+        <p class="font-size-help">整段生效；选择“默认字号”继承原有样式。</p>
       </section>
 
       <section v-if="type === 'paragraph' || type === 'heading'" class="property-section">
@@ -125,6 +185,17 @@ function setButtonStyle(event: Event) {
 
       <section v-if="type === 'image'" class="property-section">
         <h3>图片资源</h3>
+        <label class="field-label">
+          <span>图片排版</span>
+          <select :value="attrs.imageLayout ?? ''" aria-label="图片排版" :disabled="readonly" @change="emit('patch', { imageLayout: normalizeImageLayout(($event.target as HTMLSelectElement).value) })">
+            <option value="">独占一行</option>
+            <option value="two-column">一行两张</option>
+          </select>
+        </label>
+        <button class="action-button ghost pair-images-button" type="button" :disabled="readonly || !canPairNextImage" @click="emit('pairImages')">与下一张图片并排</button>
+        <p class="image-upload-help">连续图片均设为“一行两张”后并排，中间的正文会另起一行。快捷操作需下一模块也是图片。</p>
+        <ImageFilePicker class="replace-image-picker" label="上传并替换图片" :disabled="!canUpload || uploading" @files="emit('uploadImage', $event)" />
+        <p class="image-upload-help">{{ canUpload ? '上传成功后替换当前图片；也可填写下方地址。' : '宿主配置 uploadImage 后可上传图片。' }}</p>
         <label class="field-label">
           <span>图片地址 <em>必填</em></span>
           <input :value="attrs.src" type="url" placeholder="https://…" @change="textPatch('src', $event)" />
@@ -199,16 +270,6 @@ function setButtonStyle(event: Event) {
           <span>语言标识</span>
           <input :value="attrs.language" type="text" maxlength="32" placeholder="typescript" @change="optionalTextPatch('language', $event)" />
         </label>
-      </section>
-
-      <section v-if="['table', 'tableRow', 'tableCell'].includes(type)" class="property-section">
-        <h3>表格结构</h3>
-        <div class="table-actions">
-          <button type="button" @click="emit('tableCommand', 'addRowAfter')">添加行</button>
-          <button type="button" @click="emit('tableCommand', 'addColumnAfter')">添加列</button>
-          <button type="button" @click="emit('tableCommand', 'deleteRow')">删除行</button>
-          <button type="button" @click="emit('tableCommand', 'deleteColumn')">删除列</button>
-        </div>
       </section>
 
       <section v-if="['blockquote', 'bulletList', 'listItem', 'horizontalRule'].includes(type)" class="property-section property-help">

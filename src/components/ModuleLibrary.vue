@@ -1,44 +1,40 @@
 <script setup lang="ts">
 import {
   Braces,
-  Heading2,
+  ChevronDown,
   Image,
-  List,
-  ListOrdered,
-  Minus,
   MousePointerClick,
-  Pilcrow,
   Quote,
   Table2,
 } from '@lucide/vue'
-import type { Component } from 'vue'
-import type { EditorModule, ProseMirrorJSON } from '@/editor/types'
+import { computed, ref, useId, type Component } from 'vue'
+import type { EditorModule, ProseMirrorJSON } from '../editor/types'
 
 const props = defineProps<{ modules: EditorModule[] }>()
 const emit = defineEmits<{ insert: [node: ProseMirrorJSON] }>()
+const expanded = ref({ basic: true, extension: true })
+const groupId = useId()
+const groupDefinitions: { id: EditorModule['group']; title: string }[] = [
+  { id: 'basic', title: '基础内容' },
+  { id: 'extension', title: '扩展' },
+]
+const groups = computed(() => groupDefinitions.map(group => ({
+  ...group,
+  modules: props.modules.filter(module => module.group === group.id),
+})).filter(group => group.modules.length > 0))
 
 const icons: Record<string, Component> = {
-  heading: Heading2,
-  paragraph: Pilcrow,
   image: Image,
   button: MousePointerClick,
-  rule: Minus,
   quote: Quote,
-  bulletList: List,
-  orderedList: ListOrdered,
   code: Braces,
   table: Table2,
-}
-
-function byGroup(group: EditorModule['group']) {
-  return props.modules.filter((module) => module.group === group)
 }
 
 function startDrag(event: DragEvent, module: EditorModule) {
   if (!event.dataTransfer) return
   event.dataTransfer.effectAllowed = 'copy'
   event.dataTransfer.setData('application/x-article-node', JSON.stringify(module.create()))
-  event.dataTransfer.setData('text/plain', module.title)
 }
 </script>
 
@@ -50,32 +46,22 @@ function startDrag(event: DragEvent, module: EditorModule) {
       <p>点击插入，或拖放到画布</p>
     </div>
 
-    <section class="module-group">
-      <h3>基础内容</h3>
-      <div class="module-grid">
+    <section v-for="group in groups" :key="group.id" class="module-group" :data-module-group="group.id">
+      <h3>
         <button
-          v-for="module in byGroup('basic')"
-          :key="module.type"
-          class="module-card"
+          class="module-group-toggle"
           type="button"
-          draggable="true"
-          @click="emit('insert', module.create())"
-          @dragstart="startDrag($event, module)"
+          :aria-expanded="expanded[group.id]"
+          :aria-controls="`${groupId}-${group.id}`"
+          @click="expanded[group.id] = !expanded[group.id]"
         >
-          <span class="module-icon"><component :is="icons[module.icon]" :size="20" /></span>
-          <span>
-            <strong>{{ module.title }}</strong>
-            <small>{{ module.description }}</small>
-          </span>
+          <span>{{ group.title }}</span>
+          <ChevronDown :size="14" aria-hidden="true" />
         </button>
-      </div>
-    </section>
-
-    <section class="module-group">
-      <h3>结构模块</h3>
-      <div class="module-grid">
+      </h3>
+      <div v-show="expanded[group.id]" :id="`${groupId}-${group.id}`" class="module-grid">
         <button
-          v-for="module in byGroup('structure')"
+          v-for="module in group.modules"
           :key="module.type"
           class="module-card"
           type="button"
@@ -96,7 +82,7 @@ function startDrag(event: DragEvent, module: EditorModule) {
       <span class="status-dot" />
       <div>
         <strong>Article Protocol v1</strong>
-        <small>严格兼容模式</small>
+        <small>兼容 v1 · 支持颜色、字号与图片排版</small>
       </div>
     </div>
   </aside>

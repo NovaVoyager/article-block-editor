@@ -1,3 +1,6 @@
 .idea
 node_modules
 dist
+demo-dist
+.package-smoke
+*.tgz

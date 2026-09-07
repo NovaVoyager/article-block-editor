@@ -5,8 +5,11 @@ import TextAlign from '@tiptap/extension-text-align'
 import Underline from '@tiptap/extension-underline'
 import StarterKit from '@tiptap/starter-kit'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import ArticleButtonNodeView from '@/components/nodeviews/ArticleButtonNodeView.vue'
-import ImageNodeView from '@/components/nodeviews/ImageNodeView.vue'
+import ArticleButtonNodeView from '../components/nodeviews/ArticleButtonNodeView.vue'
+import ImageNodeView from '../components/nodeviews/ImageNodeView.vue'
+import { TextColor, TextHighlight } from './text-formatting'
+import { ParagraphFontSize } from './font-size'
+import { normalizeImageLayout } from './image-layout'
 
 const ProtocolDocument = Node.create({
   name: 'doc',
@@ -42,6 +45,13 @@ const ProtocolImage = Node.create({
       width: { default: null },
       height: { default: null },
       imageAlign: { default: 'center' },
+      imageLayout: {
+        default: null,
+        parseHTML: (element) => normalizeImageLayout(element.getAttribute('data-image-layout')),
+        renderHTML: (attributes) => normalizeImageLayout(attributes.imageLayout)
+          ? { 'data-image-layout': attributes.imageLayout }
+          : {},
+      },
     }
   },
 
@@ -164,6 +174,9 @@ export function createProtocolExtensions() {
     ProtocolArticleButton,
     ProtocolLink,
     Underline,
+    TextColor,
+    TextHighlight,
+    ParagraphFontSize,
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
     ProtocolTable,
     ProtocolTableRow,

@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.app.json",
+  "include": ["src/**/*.ts", "src/**/*.vue", "src/**/*.json"],
+  "exclude": ["src/**/*.test.ts", "src/App.vue", "src/main.ts", "src/library.ts", "src/demo-image-upload.ts"],
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "outDir": "dist/types",
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.lib.tsbuildinfo"
+  }
+}

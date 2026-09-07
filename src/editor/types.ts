@@ -30,6 +30,6 @@ export interface EditorModule {
   title: string
   description: string
   icon: string
-  group: 'basic' | 'structure'
+  group: 'basic' | 'extension'
   create: () => ProseMirrorJSON
 }

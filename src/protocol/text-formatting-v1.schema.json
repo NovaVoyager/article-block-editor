@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:article-content-protocol:text-formatting:v1",
+  "title": "Optional text formatting marks for Article Content Protocol v1",
+  "description": "Additional marks accepted alongside the unchanged v1 marks. Existing v1 documents require no migration. Consumers must support these marks to render colored documents.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "attrs"],
+  "properties": {
+    "type": { "enum": ["textStyle", "highlight"] },
+    "attrs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["color"],
+      "properties": {
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+      }
+    }
+  }
+}

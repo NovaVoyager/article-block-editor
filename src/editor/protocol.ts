@@ -1,9 +1,13 @@
 import Ajv, { type ErrorObject } from 'ajv'
-import protocolDefinition from '@/protocol/article-content-protocol-v1.json'
+import { baseDocumentSchema, currentDocumentSchema } from '../protocol/current-protocol'
+import { normalizeColor } from './text-formatting'
+import { normalizeFontSize } from './font-size'
+import { normalizeImageLayout } from './image-layout'
 import type { ProseMirrorJSON, ValidationResult } from './types'
 
 const ajv = new Ajv({ allErrors: true, strict: false })
-const validate = ajv.compile(protocolDefinition.documentSchema)
+const validateV1 = ajv.compile(baseDocumentSchema)
+const validate = ajv.compile(currentDocumentSchema)
 
 const textAlignments = new Set(['left', 'center', 'right', 'justify'])
 const imageAlignments = new Set(['left', 'center', 'right'])
@@ -20,6 +24,11 @@ export function validateProtocolDocument(document: ProseMirrorJSON): ValidationR
   }
 }
 
+export function validateProtocolV1Document(document: ProseMirrorJSON): ValidationResult {
+  const valid = validateV1(document)
+  return { valid: Boolean(valid), errors: valid ? [] : (validateV1.errors ?? []).map(formatError) }
+}
+
 function sanitizeNode(node: ProseMirrorJSON): ProseMirrorJSON {
   if (node.type === 'text') {
     const text: ProseMirrorJSON = { type: 'text', text: node.text ?? '' }
@@ -34,8 +43,9 @@ function sanitizeNode(node: ProseMirrorJSON): ProseMirrorJSON {
     case 'doc':
       return { type: 'doc', content }
     case 'paragraph': {
-      const attrs = pickTextAlign(node.attrs)
-      return compactContent({ type: 'paragraph', ...(attrs && { attrs }) }, content)
+      const fontSize = normalizeFontSize(node.attrs?.fontSize)
+      const attrs = { ...pickTextAlign(node.attrs), ...(fontSize !== null && { fontSize }) }
+      return compactContent({ type: 'paragraph', ...(Object.keys(attrs).length && { attrs }) }, content)
     }
     case 'heading': {
       const level = clampInteger(node.attrs?.level, 1, 6, 2)
@@ -76,6 +86,10 @@ function sanitizeNode(node: ProseMirrorJSON): ProseMirrorJSON {
 }
 
 function sanitizeMark(mark: { type: string; attrs?: Record<string, unknown> }) {
+  if (mark.type === 'textStyle' || mark.type === 'highlight') {
+    const color = normalizeColor(mark.attrs?.color)
+    return color ? { type: mark.type, attrs: { color } } : null
+  }
   if (['bold', 'italic', 'strike', 'underline', 'code'].includes(mark.type)) {
     return { type: mark.type }
   }
@@ -110,6 +124,8 @@ function sanitizeImageAttrs(attrs: Record<string, unknown> = {}) {
   addOptionalInteger(result, 'width', attrs.width, 1, 10000)
   addOptionalInteger(result, 'height', attrs.height, 1, 10000)
   if (imageAlignments.has(String(attrs.imageAlign))) result.imageAlign = attrs.imageAlign
+  const imageLayout = normalizeImageLayout(attrs.imageLayout)
+  if (imageLayout) result.imageLayout = imageLayout
   return result
 }
 

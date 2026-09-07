@@ -4,29 +4,6 @@ const defaultImage = 'https://placehold.co/1200x675/F1EEE7/3A3A36?text=Article+I
 
 export const editorModules: EditorModule[] = [
   {
-    type: 'heading',
-    title: '标题',
-    description: 'H1–H6 语义标题',
-    icon: 'heading',
-    group: 'basic',
-    create: () => ({
-      type: 'heading',
-      attrs: { level: 2 },
-      content: [{ type: 'text', text: '新的章节标题' }],
-    }),
-  },
-  {
-    type: 'paragraph',
-    title: '正文',
-    description: '可应用行内格式的段落',
-    icon: 'paragraph',
-    group: 'basic',
-    create: () => ({
-      type: 'paragraph',
-      content: [{ type: 'text', text: '在这里开始书写正文…' }],
-    }),
-  },
-  {
     type: 'image',
     title: '图片',
     description: '带尺寸与对齐设置',
@@ -42,7 +19,7 @@ export const editorModules: EditorModule[] = [
     title: '文章按钮',
     description: '文本、按钮或链接动作',
     icon: 'button',
-    group: 'basic',
+    group: 'extension',
     create: () => ({
       type: 'articleButton',
       attrs: {
@@ -54,19 +31,11 @@ export const editorModules: EditorModule[] = [
     }),
   },
   {
-    type: 'horizontalRule',
-    title: '分割线',
-    description: '划分内容章节',
-    icon: 'rule',
-    group: 'basic',
-    create: () => ({ type: 'horizontalRule' }),
-  },
-  {
     type: 'blockquote',
     title: '引用',
     description: '包含一个或多个块',
     icon: 'quote',
-    group: 'structure',
+    group: 'basic',
     create: () => ({
       type: 'blockquote',
       content: [
@@ -78,27 +47,11 @@ export const editorModules: EditorModule[] = [
     }),
   },
   {
-    type: 'bulletList',
-    title: '无序列表',
-    description: '项目符号列表',
-    icon: 'bulletList',
-    group: 'structure',
-    create: () => listDocument('bulletList'),
-  },
-  {
-    type: 'orderedList',
-    title: '有序列表',
-    description: '可设置起始序号',
-    icon: 'orderedList',
-    group: 'structure',
-    create: () => ({ ...listDocument('orderedList'), attrs: { start: 1 } }),
-  },
-  {
     type: 'codeBlock',
     title: '代码块',
     description: '支持语言标识',
     icon: 'code',
-    group: 'structure',
+    group: 'basic',
     create: () => ({
       type: 'codeBlock',
       attrs: { language: 'typescript' },
@@ -110,25 +63,10 @@ export const editorModules: EditorModule[] = [
     title: '表格',
     description: '基础语义表格',
     icon: 'table',
-    group: 'structure',
+    group: 'basic',
     create: () => tableDocument(),
   },
 ]
-
-function listDocument(type: 'bulletList' | 'orderedList'): ProseMirrorJSON {
-  return {
-    type,
-    content: ['第一项', '第二项'].map((text) => ({
-      type: 'listItem',
-      content: [
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text }],
-        },
-      ],
-    })),
-  }
-}
 
 function tableDocument(): ProseMirrorJSON {
   return {

@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:article-content-protocol:image-layout:v1",
+  "title": "Optional two-column image layout",
+  "description": "Applied to image.attrs.imageLayout. Adjacent two-column images flow two per row in document order. Other blocks break the row. Omit for the original full-row image layout.",
+  "type": "string",
+  "enum": ["two-column"]
+}

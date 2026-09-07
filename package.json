@@ -1,35 +1,76 @@
 {
-  "name": "article-block-editor",
-  "version": "1.0.0",
-  "private": true,
+  "name": "@nova_voyager/article-block-editor",
+  "version": "0.1.0",
+  "description": "Vue 3 structured article editor with ProseMirror JSON protocol support",
   "type": "module",
+  "license": "UNLICENSED",
+  "files": ["dist"],
+  "main": "./dist/article-editor.js",
+  "module": "./dist/article-editor.js",
+  "types": "./dist/types/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NovaVoyager/article-block-editor"
+  },
+  "homepage": "https://github.com/NovaVoyager/article-block-editor#readme",
+  "bugs": {
+    "url": "https://github.com/NovaVoyager/article-block-editor/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/article-editor.js"
+    },
+    "./style.css": {
+      "types": "./dist/types/style.d.ts",
+      "default": "./dist/article-editor.css"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": ["**/*.css"],
+  "keywords": ["vue", "vue3", "editor", "prosemirror", "tiptap", "article"],
+  "engines": { "node": ">=22.12.0" },
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
-    "preview": "vite preview",
-    "test": "vitest run"
+    "typecheck": "vue-tsc -b",
+    "build": "npm run typecheck && vite build && npm run build:types",
+    "build:types": "vue-tsc -p tsconfig.lib.json",
+    "build:demo": "npm run typecheck && vite build --mode demo",
+    "preview": "vite preview --mode demo",
+    "test": "vitest run",
+    "test:package": "node scripts/test-package.mjs",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run test && npm run test:package"
   },
   "dependencies": {
     "@lucide/vue": "^1.41.0",
-    "@tiptap/core": "latest",
-    "@tiptap/extension-code-block": "latest",
-    "@tiptap/extension-drag-handle-vue-3": "latest",
-    "@tiptap/extension-table": "latest",
-    "@tiptap/extension-text-align": "latest",
-    "@tiptap/extension-underline": "latest",
-    "@tiptap/pm": "latest",
-    "@tiptap/starter-kit": "latest",
-    "@tiptap/vue-3": "latest",
-    "ajv": "latest",
-    "vue": "latest"
+    "@tiptap/core": "3.31.3",
+    "@tiptap/extension-code-block": "3.31.3",
+    "@tiptap/extension-drag-handle-vue-3": "3.31.3",
+    "@tiptap/extension-table": "3.31.3",
+    "@tiptap/extension-text-align": "3.31.3",
+    "@tiptap/extension-underline": "3.31.3",
+    "@tiptap/pm": "3.31.3",
+    "@tiptap/starter-kit": "3.31.3",
+    "@tiptap/vue-3": "3.31.3",
+    "ajv": "^8.20.0"
   },
+  "peerDependencies": { "vue": "^3.5.0" },
   "devDependencies": {
-    "@types/node": "latest",
-    "@vitejs/plugin-vue": "latest",
-    "@vue/tsconfig": "latest",
+    "@types/node": "^26.4.1",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/tsconfig": "^0.9.1",
     "typescript": "~5.9.3",
-    "vite": "latest",
-    "vitest": "latest",
-    "vue-tsc": "latest"
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0",
+    "vue-tsc": "^3.3.11",
+    "vue": "^3.5.42",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^26.1.0",
+    "postcss": "^8.5.6"
   }
 }

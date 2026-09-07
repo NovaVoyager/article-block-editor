@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Check, Clipboard, Download, Upload, X } from '@lucide/vue'
 
 const props = defineProps<{
@@ -7,6 +7,7 @@ const props = defineProps<{
   value: string
   valid: boolean
   errors: string[]
+  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -16,6 +17,9 @@ const emit = defineEmits<{
 
 const draft = ref(props.value)
 const copied = ref(false)
+const copyError = ref('')
+let copyTimer: ReturnType<typeof setTimeout> | undefined
+onBeforeUnmount(() => clearTimeout(copyTimer))
 
 watch(
   () => [props.open, props.value] as const,
@@ -27,9 +31,15 @@ watch(
 const lineCount = computed(() => draft.value.split('\n').length)
 
 async function copyJson() {
-  await navigator.clipboard.writeText(draft.value)
-  copied.value = true
-  window.setTimeout(() => (copied.value = false), 1400)
+  try {
+    await navigator.clipboard.writeText(draft.value)
+    copied.value = true
+    copyError.value = ''
+    clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => (copied.value = false), 1400)
+  } catch {
+    copyError.value = '复制失败，请手动复制 JSON'
+  }
 }
 
 function downloadJson() {
@@ -50,7 +60,7 @@ function downloadJson() {
         <div>
           <span class="eyebrow">SOURCE</span>
           <h2>ProseMirror JSON</h2>
-          <p>Article Content Protocol v1</p>
+          <p>当前文章 JSON · v1 + 颜色 / 正文字号 / 图片排版扩展</p>
         </div>
         <button class="close-button" type="button" aria-label="关闭" @click="emit('close')"><X :size="20" /></button>
       </header>
@@ -68,9 +78,10 @@ function downloadJson() {
         </ul>
       </div>
 
-      <textarea v-model="draft" spellcheck="false" aria-label="JSON 内容" />
+      <textarea v-model="draft" :readonly="readonly" spellcheck="false" aria-label="JSON 内容" />
 
       <footer class="drawer-footer">
+        <span v-if="copyError" role="status">{{ copyError }}</span>
         <button class="action-button ghost" type="button" @click="copyJson">
           <Check v-if="copied" :size="16" />
           <Clipboard v-else :size="16" />
@@ -79,7 +90,7 @@ function downloadJson() {
         <button class="action-button ghost" type="button" @click="downloadJson">
           <Download :size="16" /> 下载
         </button>
-        <button class="action-button primary" type="button" @click="emit('apply', draft)">
+        <button class="action-button primary" type="button" :disabled="readonly" @click="emit('apply', draft)">
           <Upload :size="16" /> 应用到画布
         </button>
       </footer>

@@ -1,0 +1,48 @@
+/* These page-level styles belong only to the development playground. */
+html, body, #app { margin: 0; min-height: 100%; }
+body { background: #eae8e2; font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+.playground-controls {
+  box-sizing: border-box;
+  min-height: 96px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #dedbd2;
+  color: #444;
+  background: #fffefa;
+  font-size: 12px;
+}
+.playground-controls button { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; background: white; cursor: pointer; }
+.playground-controls label { display: flex; align-items: center; gap: 4px; }
+.playground-controls [role='status'] { flex-basis: 100%; color: #74736b; font-size: 11px; }
+.playground-second { padding: 24px; }
+.playground-second h2 { font-size: 16px; }
+
+.playground-json { padding: 18px 20px; border-bottom: 1px solid #dedbd2; background: #f8f7f3; color: #444; font-size: 12px; }
+.playground-json h2 { margin: 0 0 8px; font-size: 16px; }
+.playground-json p { margin: 0 0 12px; line-height: 1.6; }
+.playground-json label { display: block; margin-bottom: 6px; font-weight: 600; }
+.playground-json textarea {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: 140px;
+  padding: 12px;
+  border: 1px solid #d3cfc5;
+  border-radius: 8px;
+  background: white;
+  color: #262620;
+  font: 12px/1.5 Consolas, monospace;
+  resize: vertical;
+}
+.playground-json textarea:focus-visible { outline: 2px solid #e45032; outline-offset: 2px; }
+.playground-json textarea[aria-invalid='true'] { border-color: #c94135; }
+.playground-json-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.playground-json-actions button { padding: 8px 12px; border: 1px solid #d3cfc5; border-radius: 6px; background: white; cursor: pointer; }
+.playground-json-actions .playground-json-render { border-color: #e45032; background: #e45032; color: white; }
+.playground-json-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.playground-json-errors { margin-top: 12px; padding: 12px; border-radius: 6px; background: #fff0eb; color: #a92d23; overflow-wrap: anywhere; }
+.playground-json-errors ul { margin: 6px 0 0; padding-left: 20px; line-height: 1.6; }
+.playground-json .playground-json-success { margin: 12px 0 0; color: #2f7d59; }

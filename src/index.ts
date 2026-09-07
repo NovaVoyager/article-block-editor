@@ -1,0 +1,7 @@
+export { default as ArticleEditor } from './ArticleEditor.vue'
+export { default } from './ArticleEditor.vue'
+export { createEmptyDocument } from './editor/document'
+export { toProtocolJSON, validateProtocolDocument, validateProtocolV1Document } from './editor/protocol'
+export type { ArticleEditorProps, ArticleEditorExpose, ArticleEditorError } from './editor/public-types'
+export type { ImageUploadHandler, ImageUploadContext, ImageUploadResult } from './editor/public-types'
+export type { ProseMirrorJSON, MarkJSON, ValidationResult } from './editor/types'

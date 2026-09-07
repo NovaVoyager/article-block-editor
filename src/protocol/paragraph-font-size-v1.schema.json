@@ -1,0 +1,9 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:article-content-protocol:paragraph-font-size:v1",
+  "title": "Optional paragraph fontSize attribute (pixels)",
+  "description": "Applied to paragraph.attrs.fontSize alongside the unchanged v1 paragraph attributes. Omit to inherit the default size. Consumers must support this optional extension.",
+  "type": "integer",
+  "minimum": 8,
+  "maximum": 96
+}
