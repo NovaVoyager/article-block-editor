@@ -1,0 +1,35 @@
+{
+  "name": "article-block-editor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@lucide/vue": "^1.41.0",
+    "@tiptap/core": "latest",
+    "@tiptap/extension-code-block": "latest",
+    "@tiptap/extension-drag-handle-vue-3": "latest",
+    "@tiptap/extension-table": "latest",
+    "@tiptap/extension-text-align": "latest",
+    "@tiptap/extension-underline": "latest",
+    "@tiptap/pm": "latest",
+    "@tiptap/starter-kit": "latest",
+    "@tiptap/vue-3": "latest",
+    "ajv": "latest",
+    "vue": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@vitejs/plugin-vue": "latest",
+    "@vue/tsconfig": "latest",
+    "typescript": "~5.9.3",
+    "vite": "latest",
+    "vitest": "latest",
+    "vue-tsc": "latest"
+  }
+}
