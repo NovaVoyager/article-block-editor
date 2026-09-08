@@ -1165,12 +1165,21 @@
   display: grid;
   width: min(620px, 100%);
   height: 100%;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-areas: 'header' 'status' 'errors' 'content' 'footer';
   padding: 24px;
   background: #f8f7f3;
   box-shadow: -22px 0 60px rgba(25, 24, 20, 0.16);
   animation: article-studio-slide-in 220ms ease-out;
 }
+
+/* The optional error panel must not shift the footer into the growing content row. */
+.article-studio .json-drawer > .drawer-header { grid-area: header; }
+.article-studio .json-drawer > .json-status { grid-area: status; }
+.article-studio .json-drawer > .validation-errors { grid-area: errors; }
+.article-studio .json-drawer > textarea { grid-area: content; }
+.article-studio .json-drawer > .drawer-footer { grid-area: footer; }
 
 @keyframes article-studio-slide-in {
   from { transform: translateX(30px); opacity: 0; }
@@ -1228,6 +1237,7 @@
   margin-bottom: 10px;
   padding: 10px 12px;
   overflow: auto;
+  overflow-wrap: anywhere;
   border: 1px solid #efd1cd;
   border-radius: 8px;
   color: #98443a;
@@ -1243,7 +1253,7 @@
 .article-studio .json-drawer textarea {
   width: 100%;
   height: 100%;
-  min-height: 260px;
+  min-height: 0;
   padding: 18px;
   resize: none;
   border: 1px solid #353631;
@@ -1263,9 +1273,24 @@
 
 .article-studio .drawer-footer {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   padding-top: 15px;
+}
+
+.article-studio .drawer-footer .action-button {
+  flex: 0 0 auto;
+  height: 36px;
+}
+
+.article-studio .drawer-footer [role='status'] {
+  flex-basis: 100%;
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .article-studio .modal-backdrop {
