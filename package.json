@@ -1,11 +1,14 @@
 {
   "name": "@nova_voyager/article-block-editor",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Vue 3 structured article editor with ProseMirror JSON protocol support",
   "author": "NovaVoyager",
   "license": "MIT",
   "type": "module",
-  "files": ["dist", "docs"],
+  "files": [
+    "dist",
+    "docs"
+  ],
   "main": "./dist/article-editor.js",
   "module": "./dist/article-editor.js",
   "types": "./dist/types/index.d.ts",
@@ -32,9 +35,20 @@
     },
     "./package.json": "./package.json"
   },
-  "sideEffects": ["**/*.css"],
-  "keywords": ["vue", "vue3", "editor", "prosemirror", "tiptap", "article"],
-  "engines": { "node": ">=22.12.0" },
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "keywords": [
+    "vue",
+    "vue3",
+    "editor",
+    "prosemirror",
+    "tiptap",
+    "article"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "vite",
     "typecheck": "vue-tsc -b",
@@ -60,7 +74,9 @@
     "@tiptap/vue-3": "3.31.3",
     "ajv": "^8.20.0"
   },
-  "peerDependencies": { "vue": "^3.5.0" },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
   "devDependencies": {
     "@types/node": "^26.4.1",
     "@vitejs/plugin-vue": "^6.0.8",
