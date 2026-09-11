@@ -1,6 +1,6 @@
 {
   "name": "@nova_voyager/article-block-editor",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Vue 3 structured article editor with ProseMirror JSON protocol support",
   "author": "NovaVoyager",
   "license": "MIT",
