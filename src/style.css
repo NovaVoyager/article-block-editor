@@ -1149,7 +1149,6 @@
   margin-top: 8px;
 }
 
-.article-studio .drawer-backdrop,
 .article-studio .resource-question-node {
   position: relative;
   width: 100%;
@@ -1245,6 +1244,8 @@
 .article-studio .resource-picker header p { margin: 7px 0 16px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .article-studio .resource-picker-body { min-height: 0; overflow: auto; padding: 2px; }
 
+/* Both overlays must cover the editor and sit above its positioned panels. */
+.article-studio .drawer-backdrop,
 .article-studio .modal-backdrop {
   position: absolute;
   z-index: 80;
