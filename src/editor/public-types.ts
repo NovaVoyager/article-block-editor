@@ -31,7 +31,7 @@ export interface ArticleEditorProps {
 }
 
 export interface ArticleEditorError {
-  source: 'modelValue' | 'setContent' | 'json' | 'save' | 'upload' | 'protocol'
+  source: 'modelValue' | 'setContent' | 'json' | 'save' | 'upload' | 'protocol' | 'resourceQuestion'
   message: string
   errors: string[]
   fileName?: string
@@ -45,4 +45,6 @@ export interface ArticleEditorExpose {
   clear(): boolean
   focus(): void
   validate(): ValidationResult
+  /** Locate and highlight an anchor in this editor only. False for a missing target. */
+  scrollToAnchor(anchorId: string): boolean
 }

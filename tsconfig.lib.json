@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.app.json",
   "include": ["src/**/*.ts", "src/**/*.vue", "src/**/*.json"],
-  "exclude": ["src/**/*.test.ts", "src/App.vue", "src/main.ts", "src/library.ts", "src/demo-image-upload.ts"],
+  "exclude": ["src/**/*.test.ts", "src/App.vue", "src/main.ts", "src/library.ts", "src/demo-image-upload.ts", "src/demo-resource-question.ts", "src/components/DemoResourcePicker.vue"],
   "compilerOptions": {
     "noEmit": false,
     "declaration": true,

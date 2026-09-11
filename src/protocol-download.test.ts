@@ -66,7 +66,7 @@ describe('Current protocol download', () => {
     expect(protocol.nodes.find(node => node.type === 'paragraph')?.attributes).toContainEqual(expect.objectContaining({ name: 'fontSize', minimum: 8, maximum: 96 }))
     expect(protocol.nodes.find(node => node.type === 'image')?.attributes).toContainEqual(expect.objectContaining({ name: 'imageLayout', allowedValues: ['two-column'] }))
     expect(protocol.marks.map(mark => mark.type)).toEqual([...originalProtocol.marks.map(mark => mark.type), 'textStyle', 'highlight'])
-    expect(protocol.extensions).toHaveLength(3)
+    expect(protocol.extensions).toHaveLength(5)
     protocol.documentSchema.definitions.paragraph.properties.attrs.properties.fontSize.maximum = 10
     protocol.nodes[0]!.description = 'mutated'
     expect(getCurrentProtocol().documentSchema).toEqual(currentDocumentSchema)

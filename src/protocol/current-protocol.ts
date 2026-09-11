@@ -2,6 +2,10 @@ import protocolDefinition from './article-content-protocol-v1.json'
 import textFormattingSchema from './text-formatting-v1.schema.json'
 import fontSizeSchema from './paragraph-font-size-v1.schema.json'
 import imageLayoutSchema from './image-layout-v1.schema.json'
+import resourceQuestionSchema from './resource-question-v1.schema.json'
+
+const anchorSchema = { type: 'string', minLength: 1, pattern: '\\S', description: 'Stable paragraph/heading anchor, unique within the article.' }
+const anchorAttribute = { name: 'anchorId', type: 'string', required: false, description: anchorSchema.description }
 
 export const baseDocumentSchema = protocolDefinition.documentSchema
 
@@ -10,8 +14,25 @@ export const currentDocumentSchema = {
   ...baseDocumentSchema,
   $id: 'urn:article-content-protocol:v1:with-formatting-extensions',
   title: 'Article Content Protocol v1 + Extensions',
+  properties: {
+    ...baseDocumentSchema.properties,
+    content: { type: 'array', items: { oneOf: [
+      { $ref: '#/definitions/blockNode' }, { $ref: '#/definitions/resourceQuestion' },
+    ] } },
+  },
   definitions: {
     ...baseDocumentSchema.definitions,
+    resourceQuestion: resourceQuestionSchema,
+    heading: {
+      ...baseDocumentSchema.definitions.heading,
+      properties: {
+        ...baseDocumentSchema.definitions.heading.properties,
+        attrs: {
+          ...baseDocumentSchema.definitions.heading.properties.attrs,
+          properties: { ...baseDocumentSchema.definitions.heading.properties.attrs.properties, anchorId: anchorSchema },
+        },
+      },
+    },
     image: {
       ...baseDocumentSchema.definitions.image,
       properties: {
@@ -34,6 +55,7 @@ export const currentDocumentSchema = {
           properties: {
             ...baseDocumentSchema.definitions.paragraph.properties.attrs.properties,
             fontSize: fontSizeSchema,
+            anchorId: anchorSchema,
           },
         },
       },
@@ -53,11 +75,17 @@ const currentProtocol = {
     { id: 'text-formatting', version: 1, schemaId: textFormattingSchema.$id },
     { id: 'paragraph-font-size', version: 1, schemaId: fontSizeSchema.$id },
     { id: 'image-layout', version: 1, schemaId: imageLayoutSchema.$id },
+    { id: 'resource-question', version: 1, schemaId: resourceQuestionSchema.$id },
+    { id: 'paragraph-anchor', version: 1 },
   ],
-  nodes: protocolDefinition.nodes.map(node => {
+  nodes: [...protocolDefinition.nodes.map(node => {
+    if (node.type === 'heading') return {
+      ...node, attributes: [...node.attributes, anchorAttribute],
+      render: { ...node.render, attributeBindings: { ...node.render.attributeBindings, anchorId: 'data-anchor-id' } },
+    }
     if (node.type === 'paragraph') return {
       ...node,
-      attributes: [...node.attributes, {
+      attributes: [...node.attributes, anchorAttribute, {
         name: 'fontSize', type: fontSizeSchema.type, required: false,
         description: fontSizeSchema.description,
         minimum: fontSizeSchema.minimum, maximum: fontSizeSchema.maximum,
@@ -66,6 +94,7 @@ const currentProtocol = {
         ...node.render,
         styleBindings: { ...node.render.styleBindings, fontSize: 'font-size' },
         styleUnits: { fontSize: 'px' },
+        attributeBindings: { ...node.render.attributeBindings, anchorId: 'data-anchor-id' },
       },
     }
     if (node.type === 'image') return {
@@ -85,7 +114,22 @@ const currentProtocol = {
       },
     }
     return node
-  }),
+  }), {
+    type: 'resourceQuestion', description: 'Top-level resource question snapshot. Rendering never fetches resource data.',
+    attributes: Object.entries(resourceQuestionSchema.properties.attrs.properties).map(([name, schema]) => ({
+      name, type: schema.type, required: true, description: `See documentSchema.definitions.resourceQuestion.properties.attrs.properties.${name}`,
+    })),
+    render: { mode: 'component', element: 'resource-question' },
+  }],
+  resourceQuestionRules: {
+    data: 'Save the selected resourceId, title, description and options as a snapshot. Option IDs are stable strings supplied by the resource. Do not fetch on render.',
+    identity: 'Question id, revealKey and paragraph/heading anchorId must each be unique within the document; option id must be unique within its question. Enforce these semantic checks in addition to JSON Schema.',
+    draft: 'resourceId="" with empty title, description and options is an unconfigured placeholder. Render a neutral placeholder; never unlock automatically.',
+    placement: 'resourceQuestion is allowed only as a direct child of doc.',
+    navigation: 'Match the selected option.targetAnchorId to a paragraph or heading in this article instance. Missing/unbound targets do not navigate. After business-controlled reveal, wait for layout before scrolling.',
+    visibility: 'Scan top-level nodes in order. Include a resourceQuestion, then stop if hideFollowing=true and its revealKey is absent from the host-supplied revealed keys. Recompute from the original document when keys change. Clicking an option does not automatically unlock.',
+    security: 'Visibility is presentation only, not authorization. Hidden article data remains in the JSON; sensitive data must be protected on the server.',
+  },
   marks: [
     ...protocolDefinition.marks,
     ...textFormattingSchema.properties.type.enum.map(type => ({

@@ -16,6 +16,8 @@ import type { TableCommand, TableContext } from '../editor/table'
 import { normalizeFontSize } from '../editor/font-size'
 import { normalizeImageLayout } from '../editor/image-layout'
 import ImageFilePicker from './ImageFilePicker.vue'
+import ResourceQuestionSettings from './ResourceQuestionSettings.vue'
+import type { ParagraphTarget, ResourceQuestionAttrs } from '../editor/resource-question'
 
 const props = defineProps<{
   selected: SelectedNode | null
@@ -25,6 +27,7 @@ const props = defineProps<{
   canUpload?: boolean
   uploading?: boolean
   canPairNextImage?: boolean
+  paragraphTargets?: ParagraphTarget[]
 }>()
 
 const emit = defineEmits<{
@@ -35,6 +38,9 @@ const emit = defineEmits<{
   tableCommand: [command: TableCommand]
   uploadImage: [files: File[]]
   pairImages: []
+  chooseResource: []
+  bindOption: [optionId: string, targetPos: number | null]
+  navigateAnchor: [anchorId?: string]
 }>()
 
 const names: Record<string, string> = {
@@ -48,6 +54,7 @@ const names: Record<string, string> = {
   horizontalRule: '分割线',
   image: '图片',
   articleButton: '文章按钮',
+  resourceQuestion: '资源问题',
   table: '表格',
   tableRow: '表格行',
   tableCell: '表格单元格',
@@ -255,6 +262,9 @@ function setButtonStyle(event: Event) {
           <input :value="attrs.title" type="text" placeholder="可选" @change="optionalTextPatch('title', $event)" />
         </label>
       </section>
+
+      <ResourceQuestionSettings v-if="type === 'resourceQuestion'" :question="attrs as unknown as ResourceQuestionAttrs" :targets="paragraphTargets ?? []" :readonly="readonly"
+        @choose="emit('chooseResource')" @bind="(optionId, pos) => emit('bindOption', optionId, pos)" @navigate="emit('navigateAnchor', $event)" @patch="emit('patch', $event)" />
 
       <section v-if="type === 'orderedList'" class="property-section">
         <h3>列表设置</h3>

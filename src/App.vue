@@ -5,6 +5,8 @@ import { ArticleEditor, createEmptyDocument, validateProtocolDocument } from './
 import type { ArticleEditorError, ArticleEditorExpose, ProseMirrorJSON } from './index'
 import { initialDocument } from './editor/modules'
 import { demoImageUpload } from './demo-image-upload'
+import DemoResourcePicker from './components/DemoResourcePicker.vue'
+import { resourceQuestionDemo } from './demo-resource-question'
 import './playground.css'
 
 const STORAGE_KEY = 'article-studio.protocol-v1.document'
@@ -98,6 +100,7 @@ function renderJson() {
       <strong>组件测试入口</strong>
       <button class="playground-json-toggle" type="button" :aria-expanded="jsonInputOpen" aria-controls="demo-json-input" @click="jsonInputOpen = !jsonInputOpen">JSON 字符串渲染</button>
       <button type="button" @click="content = cloneSample()">加载示例</button>
+      <button type="button" @click="content = resourceQuestionDemo()">资源问题示例</button>
       <button type="button" @click="editorRef?.clear()">清空文档</button>
       <label><input v-model="readonly" type="checkbox" />只读</label>
       <label><input v-model="showSecond" type="checkbox" />第二个实例</label>
@@ -144,10 +147,16 @@ function renderJson() {
       @change="changeCount++"
       @save="save"
       @error="handleError"
-    />
+    >
+      <template #resource-question-picker="{ current, select, cancel }">
+        <DemoResourcePicker :current="current" @confirm="select" @cancel="cancel" />
+      </template>
+    </ArticleEditor>
     <section v-if="showSecond" class="playground-second">
       <h2>独立实例（数据互不影响）</h2>
-      <ArticleEditor v-model="secondContent" :height="600" :show-inspector="false" :upload-image="demoImageUpload" :max-image-size="2 * 1024 * 1024" />
+      <ArticleEditor v-model="secondContent" :height="600" :show-inspector="false" :upload-image="demoImageUpload" :max-image-size="2 * 1024 * 1024">
+        <template #resource-question-picker="{ current, select, cancel }"><DemoResourcePicker :current="current" @confirm="select" @cancel="cancel" /></template>
+      </ArticleEditor>
     </section>
   </div>
 </template>

@@ -1,0 +1,42 @@
+{
+  "$id": "urn:article-content-protocol:resource-question:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "attrs"],
+  "properties": {
+    "type": { "const": "resourceQuestion" },
+    "attrs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "resourceId", "title", "description", "options", "hideFollowing", "revealKey"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "resourceId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "label"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1, "pattern": "\\S" },
+              "label": { "type": "string", "minLength": 1, "pattern": "\\S" },
+              "targetAnchorId": { "type": "string", "minLength": 1, "pattern": "\\S" }
+            }
+          }
+        },
+        "hideFollowing": { "type": "boolean" },
+        "revealKey": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "resourceId": { "const": "" } } },
+          "then": { "properties": { "title": { "const": "" }, "description": { "const": "" }, "options": { "maxItems": 0 } } },
+          "else": { "properties": { "resourceId": { "pattern": "\\S" }, "title": { "minLength": 1, "pattern": "\\S" }, "options": { "minItems": 1 } } }
+        }
+      ]
+    }
+  }
+}

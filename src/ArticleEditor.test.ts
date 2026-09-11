@@ -133,8 +133,8 @@ describe('ArticleEditor public component contract', () => {
     const { wrapper } = await create()
     expect(wrapper.findAll('.module-group-toggle').map(toggle => toggle.text())).toEqual(['基础内容', '扩展'])
     expect(wrapper.findAll('[data-module-group="basic"] .module-card strong').map(label => label.text())).toEqual(['图片', '引用', '代码块', '表格'])
-    expect(wrapper.findAll('[data-module-group="extension"] .module-card strong').map(label => label.text())).toEqual(['文章按钮'])
-    expect(wrapper.findAll('.module-card')).toHaveLength(5)
+    expect(wrapper.findAll('[data-module-group="extension"] .module-card strong').map(label => label.text())).toEqual(['文章按钮', '资源问题'])
+    expect(wrapper.findAll('.module-card')).toHaveLength(6)
     expect(wrapper.findAll('select[aria-label="块类型"] option').map(option => option.text())).toEqual(['正文', '标题 1', '标题 2', '标题 3', '标题 4', '标题 5', '标题 6'])
     for (const title of ['有序列表', '无序列表', '分割线']) {
       expect(wrapper.find(`.format-bar button[title="${title}"]`).exists()).toBe(true)

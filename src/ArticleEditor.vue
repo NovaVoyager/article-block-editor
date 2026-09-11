@@ -10,6 +10,10 @@ import JsonPanel from './components/JsonPanel.vue'
 import LinkDialog from './components/LinkDialog.vue'
 import ModuleLibrary from './components/ModuleLibrary.vue'
 import ImageFilePicker from './components/ImageFilePicker.vue'
+import ResourceQuestionPicker from './components/ResourceQuestionPicker.vue'
+import { anchorHighlightKey } from './editor/anchors'
+import { closeHistory } from '@tiptap/pm/history'
+import { bindQuestionOption, findQuestion, paragraphTargets, snapshotResourceQuestion, type ParagraphTarget, type ResourceQuestionAttrs, type ResourceQuestionPickerScope } from './editor/resource-question'
 import { createImageUploadManager, DEFAULT_MAX_IMAGE_SIZE } from './editor/image-upload'
 import { nextImagePosition, pairWithNextImage } from './editor/image-layout'
 import { createProtocolExtensions } from './editor/extensions'
@@ -45,7 +49,13 @@ const emit = defineEmits<{
   validation: [result: ValidationResult]
   error: [error: ArticleEditorError]
 }>()
+defineSlots<{ 'resource-question-picker'(scope: ResourceQuestionPickerScope): unknown }>()
 
+const rootElement = ref<HTMLElement>()
+const targets = shallowRef<ParagraphTarget[]>([])
+const pickerSession = shallowRef<ResourceQuestionPickerScope | null>(null)
+const pickerError = ref('')
+let highlightTimer: number | undefined
 const selected = shallowRef<SelectedNode | null>(null)
 const selectedTable = shallowRef<TableContext | null>(null)
 const validation = ref<ValidationResult>({ valid: true, errors: [] })
@@ -66,7 +76,7 @@ let toastTimer: number | undefined
 let applyingExternal = false
 
 const editor = useEditor({
-  extensions: createProtocolExtensions(),
+  extensions: createProtocolExtensions({ onChoose: openResourcePicker, onNavigate: navigateAnchor }),
   content: createEmptyDocument(),
   editable: !isReadonly.value,
   injectCSS: false,
@@ -110,6 +120,7 @@ const currentLinkAttrs = computed(() => editor.value?.getAttributes('link') ?? {
 watch(isReadonly, (value) => {
   editor.value?.setEditable(!value, false)
   if (value) {
+    closeResourcePicker()
     linkOpen.value = false
     fileDragActive.value = false
     imageUploads?.cancelAll()
@@ -120,8 +131,10 @@ watch(() => props.modelValue, (value) => {
 }, { deep: true })
 
 onBeforeUnmount(() => {
+  closeResourcePicker()
   imageUploads?.destroy()
   if (toastTimer) window.clearTimeout(toastTimer)
+  if (highlightTimer) window.clearTimeout(highlightTimer)
 })
 
 function emitDocument(currentEditor: CoreEditor) {
@@ -139,7 +152,7 @@ function replaceContent(value: ProseMirrorJSON, source: ArticleEditorError['sour
   if (!currentEditor || currentEditor.isDestroyed) return false
   applyingExternal = true
   try {
-    const changed = replaceEditorDocument(currentEditor, value, () => imageUploads?.cancelAll())
+    const changed = replaceEditorDocument(currentEditor, value, () => { imageUploads?.cancelAll(); closeResourcePicker() })
     refreshEditorState(currentEditor)
     if (changed && notify) emitDocument(currentEditor)
     return true
@@ -154,6 +167,8 @@ function replaceContent(value: ProseMirrorJSON, source: ArticleEditorError['sour
 function refreshSelection(currentEditor: CoreEditor) {
   selected.value = getSelectedNode(currentEditor)
   selectedTable.value = getTableContext(currentEditor)
+  targets.value = paragraphTargets(currentEditor.state.doc)
+  if (pickerSession.value && !findQuestion(currentEditor.state.doc, pickerSession.value.current.id)) closeResourcePicker()
 }
 
 function refreshEditorState(currentEditor: CoreEditor | null | undefined = editor.value) {
@@ -167,6 +182,14 @@ function refreshEditorState(currentEditor: CoreEditor | null | undefined = edito
 
 function insertModule(node: ProseMirrorJSON) {
   if (!editor.value || isReadonly.value) return
+  if (node.type === 'resourceQuestion') {
+    const { $to } = editor.value.state.selection
+    const pos = $to.depth ? $to.after(1) : $to.pos
+    editor.value.view.dispatch(closeHistory(editor.value.state.tr).insert(pos, editor.value.schema.nodeFromJSON(node)).scrollIntoView())
+    selectNode(editor.value, pos)
+    showToast('资源问题已插入，请选择资源', 'success')
+    return
+  }
   editor.value.chain().focus().insertContent(node).run()
   showToast('模块已插入', 'success')
 }
@@ -268,7 +291,85 @@ function handleCanvasDrop(event: DragEvent) {
 
 function patchSelectedNode(attributes: Record<string, unknown>) {
   if (!editor.value || !selected.value || isReadonly.value) return
+  if (selected.value.node.type.name === 'resourceQuestion') {
+    const tr = closeHistory(editor.value.state.tr).setNodeMarkup(selected.value.pos, undefined, { ...selected.value.node.attrs, ...attributes })
+    const result = validateProtocolDocument(toProtocolJSON(tr.doc.toJSON() as ProseMirrorJSON))
+    if (!result.valid) { showToast('设置未应用：解锁标识须非空且在文章内唯一', 'error'); return }
+    editor.value.view.dispatch(tr)
+    return
+  }
   updateNodeAttrs(editor.value, selected.value, attributes)
+}
+
+function closeResourcePicker() {
+  pickerSession.value = null
+  pickerError.value = ''
+}
+
+function openResourcePicker(id?: string) {
+  const currentEditor = editor.value
+  if (!currentEditor || isReadonly.value) return
+  const questionId = id ?? (selected.value?.node.type.name === 'resourceQuestion' ? selected.value.node.attrs.id : null)
+  const question = questionId ? findQuestion(currentEditor.state.doc, questionId) : undefined
+  if (!question) return
+  const session: ResourceQuestionPickerScope = {
+    current: JSON.parse(JSON.stringify(question.node.attrs)) as ResourceQuestionAttrs,
+    cancel: () => { if (pickerSession.value === session) closeResourcePicker() },
+    select: data => {
+      // Ignore late async responses after cancel, replacement, deletion or unmount.
+      if (pickerSession.value !== session || currentEditor.isDestroyed || isReadonly.value) return false
+      const target = findQuestion(currentEditor.state.doc, questionId)
+      if (!target) { closeResourcePicker(); return false }
+      try {
+        const snapshot = snapshotResourceQuestion(data)
+        const old = target.node.attrs as ResourceQuestionAttrs
+        const options = snapshot.options.map(option => {
+          const previous = old.resourceId === snapshot.resourceId ? old.options.find(item => item.id === option.id) : undefined
+          return { ...option, ...(previous?.targetAnchorId && { targetAnchorId: previous.targetAnchorId }) }
+        })
+        const tr = closeHistory(currentEditor.state.tr).setNodeMarkup(target.pos, undefined, { ...old, ...snapshot, options })
+        currentEditor.view.dispatch(tr)
+        closeResourcePicker()
+        showToast('资源快照已保存到模块属性', 'success')
+        return true
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        pickerError.value = message
+        emit('error', { source: 'resourceQuestion', message, errors: [message] })
+        return false
+      }
+    },
+  }
+  pickerError.value = ''
+  pickerSession.value = session
+}
+
+function bindSelectedOption(optionId: string, targetPos: number | null) {
+  if (!editor.value || isReadonly.value || selected.value?.node.type.name !== 'resourceQuestion') return
+  if (!bindQuestionOption(editor.value, selected.value.node.attrs.id, optionId, targetPos)) showToast('目标已变化，请重新选择段落', 'error')
+}
+
+function scrollToAnchor(anchorId: string): boolean {
+  const currentEditor = editor.value
+  if (!currentEditor || currentEditor.isDestroyed || !anchorId) return false
+  const target = paragraphTargets(currentEditor.state.doc).find(item => item.anchorId === anchorId)
+  const element = target ? currentEditor.view.nodeDOM(target.pos) : null
+  const scroll = rootElement.value?.querySelector<HTMLElement>('.canvas-scroll')
+  if (!(element instanceof HTMLElement) || !scroll) return false
+  const top = Math.max(0, scroll.scrollTop + element.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 32)
+  if (typeof scroll.scrollTo === 'function') scroll.scrollTo({ top, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+  else scroll.scrollTop = top
+  if (highlightTimer) window.clearTimeout(highlightTimer)
+  currentEditor.view.dispatch(currentEditor.state.tr.setMeta(anchorHighlightKey, anchorId).setMeta('addToHistory', false))
+  highlightTimer = window.setTimeout(() => {
+    if (!currentEditor.isDestroyed) currentEditor.view.dispatch(currentEditor.state.tr.setMeta(anchorHighlightKey, null).setMeta('addToHistory', false))
+  }, 1800)
+  return true
+}
+
+function navigateAnchor(anchorId?: string) {
+  if (!anchorId) { showToast('该选项尚未绑定目标段落', 'error'); return }
+  if (!scrollToAnchor(anchorId)) showToast('目标段落已失效，请重新绑定', 'error')
 }
 
 function pairSelectedImage() {
@@ -385,12 +486,13 @@ const api: ArticleEditorExpose = {
   clear: () => replaceContent(createEmptyDocument(), 'setContent'),
   focus: () => { editor.value?.commands.focus() },
   validate: () => validateProtocolDocument(api.getJSON()),
+  scrollToAnchor,
 }
 defineExpose(api)
 </script>
 
 <template>
-  <div class="article-studio" :style="rootStyle">
+  <div ref="rootElement" class="article-studio" :style="rootStyle">
   <div class="app-shell" :class="{ 'preview-mode': isReadonly, 'without-toolbar': !showToolbar }">
     <EditorToolbar
       v-if="showToolbar"
@@ -481,6 +583,10 @@ defineExpose(api)
         :can-upload="Boolean(uploadImage) && !isReadonly"
         :uploading="uploadCount > 0"
         :can-pair-next-image="canPairNextImage"
+        :paragraph-targets="targets"
+        @choose-resource="openResourcePicker()"
+        @bind-option="bindSelectedOption"
+        @navigate-anchor="navigateAnchor"
         @patch="patchSelectedNode"
         @move="moveSelectedNode"
         @duplicate="duplicateSelectedNode"
@@ -508,6 +614,10 @@ defineExpose(api)
       @apply="applyLink"
       @remove="removeLink"
     />
+
+    <ResourceQuestionPicker v-if="pickerSession" :session="pickerSession" :error="pickerError">
+      <template v-if="$slots['resource-question-picker']" #default="scope"><slot name="resource-question-picker" v-bind="scope" /></template>
+    </ResourceQuestionPicker>
 
     <Transition name="toast">
       <div v-if="toast" class="toast-message" :class="toast.tone">

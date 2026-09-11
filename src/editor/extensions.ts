@@ -10,11 +10,13 @@ import ImageNodeView from '../components/nodeviews/ImageNodeView.vue'
 import { TextColor, TextHighlight } from './text-formatting'
 import { ParagraphFontSize } from './font-size'
 import { normalizeImageLayout } from './image-layout'
+import { ParagraphAnchors } from './anchors'
+import { ProtocolResourceQuestion, type ResourceQuestionHandlers } from './resource-question-extension'
 
 const ProtocolDocument = Node.create({
   name: 'doc',
   topNode: true,
-  content: 'block*',
+  content: '(block | resourceQuestion)*',
 })
 
 const ProtocolCodeBlock = CodeBlock.extend({
@@ -159,7 +161,7 @@ const ProtocolTable = Table.extend({ content: 'tableRow+' }).configure({
 const ProtocolTableRow = TableRow.extend({ content: 'tableCell+' })
 const ProtocolTableCell = TableCell.extend({ content: 'block+' })
 
-export function createProtocolExtensions() {
+export function createProtocolExtensions(resourceQuestionHandlers: ResourceQuestionHandlers = {}) {
   return [
     StarterKit.configure({
       document: false,
@@ -172,6 +174,8 @@ export function createProtocolExtensions() {
     ProtocolCodeBlock,
     ProtocolImage,
     ProtocolArticleButton,
+    ProtocolResourceQuestion.configure(resourceQuestionHandlers),
+    ParagraphAnchors,
     ProtocolLink,
     Underline,
     TextColor,

@@ -1,6 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import type { SelectedNode } from './types'
+import { copyWithFreshIdentities } from './anchors'
 
 export function getSelectedNode(editor: Editor): SelectedNode | null {
   const { doc, selection } = editor.state
@@ -24,6 +25,7 @@ export function getSelectedNode(editor: Editor): SelectedNode | null {
     'codeBlock',
     'image',
     'articleButton',
+    'resourceQuestion',
     'table',
     'tableRow',
     'tableCell',
@@ -63,7 +65,7 @@ export function deleteNode(editor: Editor, selected: SelectedNode) {
 }
 
 export function duplicateNode(editor: Editor, selected: SelectedNode) {
-  let duplicate = selected.node
+  let duplicate = copyWithFreshIdentities(selected.node)
   if (duplicate.type.name === 'articleButton' && duplicate.attrs.style !== 'link') {
     duplicate = duplicate.type.create(
       { ...duplicate.attrs, id: `action-${crypto.randomUUID().slice(0, 8)}` },

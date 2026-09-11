@@ -4,6 +4,7 @@ import { normalizeColor } from './text-formatting'
 import { normalizeFontSize } from './font-size'
 import { normalizeImageLayout } from './image-layout'
 import type { ProseMirrorJSON, ValidationResult } from './types'
+import { resourceIdentityErrors, type ResourceQuestionOption } from './resource-question'
 
 const ajv = new Ajv({ allErrors: true, strict: false })
 const validateV1 = ajv.compile(baseDocumentSchema)
@@ -18,9 +19,10 @@ export function toProtocolJSON(document: ProseMirrorJSON): ProseMirrorJSON {
 
 export function validateProtocolDocument(document: ProseMirrorJSON): ValidationResult {
   const valid = validate(document)
+  const errors = valid ? resourceIdentityErrors(document) : (validate.errors ?? []).map(formatError)
   return {
-    valid: Boolean(valid),
-    errors: valid ? [] : (validate.errors ?? []).map(formatError),
+    valid: errors.length === 0,
+    errors,
   }
 }
 
@@ -44,12 +46,12 @@ function sanitizeNode(node: ProseMirrorJSON): ProseMirrorJSON {
       return { type: 'doc', content }
     case 'paragraph': {
       const fontSize = normalizeFontSize(node.attrs?.fontSize)
-      const attrs = { ...pickTextAlign(node.attrs), ...(fontSize !== null && { fontSize }) }
+      const attrs = { ...pickTextAlign(node.attrs), ...pickAnchor(node.attrs), ...(fontSize !== null && { fontSize }) }
       return compactContent({ type: 'paragraph', ...(Object.keys(attrs).length && { attrs }) }, content)
     }
     case 'heading': {
       const level = clampInteger(node.attrs?.level, 1, 6, 2)
-      const attrs = { level, ...pickTextAlign(node.attrs) }
+      const attrs = { level, ...pickTextAlign(node.attrs), ...pickAnchor(node.attrs) }
       return compactContent({ type: 'heading', attrs }, content)
     }
     case 'blockquote':
@@ -80,6 +82,16 @@ function sanitizeNode(node: ProseMirrorJSON): ProseMirrorJSON {
       return { type: 'image', attrs: sanitizeImageAttrs(node.attrs) }
     case 'articleButton':
       return { type: 'articleButton', attrs: sanitizeButtonAttrs(node.attrs) }
+    case 'resourceQuestion': {
+      const attrs = node.attrs ?? {}
+      return { type: 'resourceQuestion', attrs: {
+        id: attrs.id, resourceId: attrs.resourceId, title: attrs.title, description: attrs.description,
+        options: ((attrs.options ?? []) as ResourceQuestionOption[]).map(option => ({
+          id: option.id, label: option.label, ...(option.targetAnchorId && { targetAnchorId: option.targetAnchorId }),
+        })),
+        hideFollowing: attrs.hideFollowing, revealKey: attrs.revealKey,
+      } }
+    }
     default:
       return compactContent({ type: node.type }, content)
   }
@@ -146,6 +158,10 @@ function sanitizeButtonAttrs(attrs: Record<string, unknown> = {}) {
 function pickTextAlign(attrs: Record<string, unknown> = {}) {
   const textAlign = String(attrs.textAlign ?? '')
   return textAlignments.has(textAlign) ? { textAlign } : undefined
+}
+
+function pickAnchor(attrs: Record<string, unknown> = {}) {
+  return typeof attrs.anchorId === 'string' && attrs.anchorId.trim() ? { anchorId: attrs.anchorId } : {}
 }
 
 function compactContent(node: ProseMirrorJSON, content: ProseMirrorJSON[]) {

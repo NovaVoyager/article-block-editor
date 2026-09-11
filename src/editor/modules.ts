@@ -1,4 +1,5 @@
 import type { EditorModule, ProseMirrorJSON } from './types'
+import { createResourceQuestion } from './resource-question'
 
 const defaultImage = 'https://placehold.co/1200x675/F1EEE7/3A3A36?text=Article+Image'
 
@@ -45,6 +46,10 @@ export const editorModules: EditorModule[] = [
         },
       ],
     }),
+  },
+  {
+    type: 'resourceQuestion', title: '资源问题', description: '问题快照、选项与段落跳转',
+    icon: 'question', group: 'extension', create: createResourceQuestion,
   },
   {
     type: 'codeBlock',

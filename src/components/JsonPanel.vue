@@ -60,7 +60,7 @@ function downloadJson() {
         <div>
           <span class="eyebrow">SOURCE</span>
           <h2>ProseMirror JSON</h2>
-          <p>当前文章 JSON · v1 + 颜色 / 正文字号 / 图片排版扩展</p>
+          <p>当前文章 JSON · v1 + 格式 / 图片排版 / 资源问题扩展</p>
         </div>
         <button class="close-button" type="button" aria-label="关闭" @click="emit('close')"><X :size="20" /></button>
       </header>

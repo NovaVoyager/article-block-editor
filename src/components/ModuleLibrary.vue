@@ -2,6 +2,7 @@
 import {
   Braces,
   ChevronDown,
+  CircleHelp,
   Image,
   MousePointerClick,
   Quote,
@@ -29,6 +30,7 @@ const icons: Record<string, Component> = {
   quote: Quote,
   code: Braces,
   table: Table2,
+  question: CircleHelp,
 }
 
 function startDrag(event: DragEvent, module: EditorModule) {
@@ -82,7 +84,7 @@ function startDrag(event: DragEvent, module: EditorModule) {
       <span class="status-dot" />
       <div>
         <strong>Article Protocol v1</strong>
-        <small>兼容 v1 · 支持颜色、字号与图片排版</small>
+        <small>兼容 v1 · 支持资源问题与段落锚点</small>
       </div>
     </div>
   </aside>

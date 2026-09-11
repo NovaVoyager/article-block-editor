@@ -5,7 +5,7 @@
   "author": "NovaVoyager",
   "license": "MIT",
   "type": "module",
-  "files": ["dist"],
+  "files": ["dist", "docs"],
   "main": "./dist/article-editor.js",
   "module": "./dist/article-editor.js",
   "types": "./dist/types/index.d.ts",
