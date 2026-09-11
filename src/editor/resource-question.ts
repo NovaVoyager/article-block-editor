@@ -31,6 +31,7 @@ export interface ResourceQuestionData {
 export interface ResourceQuestionOption {
   id: string
   label: string
+  /** New bindings equal id; legacy documents may reference a different anchor. */
   targetAnchorId?: string
 }
 export interface ResourceQuestionAttrs extends ResourceQuestionData {
@@ -99,26 +100,69 @@ export function paragraphTargets(doc: PMNode): ParagraphTarget[] {
   return targets
 }
 
-/** Anchor creation and option binding are one undoable transaction. */
-export function bindQuestionOption(editor: Editor, questionId: string, optionId: string, targetPos: number | null): boolean {
-  if (!editor.isEditable) return false
+/** New bindings use the external option ID as the anchor; legacy JSON is not migrated on load. */
+export function bindQuestionOption(editor: Editor, questionId: string, optionId: string, targetPos: number | null, onError?: (message: string) => void): boolean {
+  const fail = (message: string) => { onError?.(message); return false }
+  if (editor.isDestroyed || !editor.isEditable) return false
   const question = findQuestion(editor.state.doc, questionId)
-  if (!question) return false
+  if (!question) return fail('问题已不存在，请重新选择')
   const attrs = question.node.attrs as ResourceQuestionAttrs
-  if (!attrs.options.some(option => option.id === optionId)) return false
-  const tr = closeHistory(editor.state.tr)
-  let anchorId: string | undefined
-  if (targetPos !== null) {
-    const target = paragraphTargets(editor.state.doc).find(item => item.pos === targetPos)
-    if (!target) return false
-    anchorId = target.anchorId || newIdentity('paragraph')
-    if (!target.anchorId) tr.setNodeMarkup(targetPos, undefined, { ...tr.doc.nodeAt(targetPos)!.attrs, anchorId })
-  }
-  const options = attrs.options.map(option => {
-    if (option.id !== optionId) return { ...option }
-    return { id: option.id, label: option.label, ...(anchorId && { targetAnchorId: anchorId }) }
+  if (!attrs.options.some(option => option.id === optionId)) return fail('选项已不存在，请重新选择资源')
+
+  const references: { questionId: string; option: ResourceQuestionOption }[] = []
+  editor.state.doc.forEach(node => {
+    if (node.type.name !== 'resourceQuestion') return
+    for (const option of (node.attrs as ResourceQuestionAttrs).options) references.push({ questionId: node.attrs.id, option })
   })
-  editor.view.dispatch(tr.setNodeMarkup(question.pos, undefined, { ...attrs, options }))
+  const otherReferences = (anchor: string) => references.filter(item => item.option.targetAnchorId === anchor
+    && !(item.questionId === questionId && item.option.id === optionId))
+
+  let anchorId: string | undefined
+  let renameFrom: string | null = null
+  const tr = closeHistory(editor.state.tr)
+  if (targetPos !== null) {
+    const targets = paragraphTargets(editor.state.doc)
+    const target = targets.find(item => item.pos === targetPos)
+    if (!target) return fail('目标已变化，请重新选择段落')
+    anchorId = optionId
+    const existing = targets.find(item => item.anchorId === optionId)
+    if (existing?.pos !== targetPos && otherReferences(optionId).length) {
+      return fail(`选项 ID「${optionId}」已被其他问题的跳转引用，不能绑定到另一段落。请使用原目标或先清除冲突绑定。`)
+    }
+    if (target.anchorId && target.anchorId !== optionId
+      && otherReferences(target.anchorId).some(item => item.option.id !== optionId)) {
+      return fail('目标段落已绑定其他 ID 的选项，不能覆盖其锚点。请换一个段落或先清除冲突绑定。')
+    }
+    // Relocating an unshared option anchor must not create a duplicate ID.
+    // Keep the old paragraph's content; old UUID anchors remain unless renamed in place.
+    if (existing && existing.pos !== targetPos) {
+      tr.setNodeMarkup(existing.pos, undefined, { ...tr.doc.nodeAt(existing.pos)!.attrs, anchorId: null })
+    }
+    if (target.anchorId !== optionId) {
+      renameFrom = target.anchorId
+      tr.setNodeMarkup(targetPos, undefined, { ...tr.doc.nodeAt(targetPos)!.attrs, anchorId })
+    }
+  }
+
+  editor.state.doc.forEach((node, pos) => {
+    if (node.type.name !== 'resourceQuestion') return
+    const current = node.attrs as ResourceQuestionAttrs
+    let changed = false
+    const options = current.options.map(option => {
+      const selected = current.id === questionId && option.id === optionId
+      // Copies of a question may share the same option ID and old target. Keep
+      // those links pointing at the same paragraph when its legacy anchor is renamed.
+      if (!selected && !(renameFrom && option.targetAnchorId === renameFrom)) return option
+      if (option.targetAnchorId === anchorId) return option
+      changed = true
+      return { id: option.id, label: option.label, ...(anchorId && { targetAnchorId: anchorId }) }
+    })
+    if (changed) tr.setNodeMarkup(pos, undefined, { ...current, options })
+  })
+  if (tr.docChanged) {
+    editor.view.dispatch(tr)
+    editor.view.dispatch(closeHistory(editor.state.tr))
+  }
   return true
 }
 

@@ -27,7 +27,7 @@
         "description": "选择一个选项查看文章中的对应内容",
         "image": { "src": "/images/sleep-question.png", "alt": "睡眠问题配图", "width": 960, "height": 360 },
         "options": [
-          { "id": "option-a", "label": "5 分钟以内", "targetAnchorId": "paragraph-a" },
+          { "id": "option-a", "label": "5 分钟以内", "targetAnchorId": "option-a" },
           { "id": "option-b", "label": "其他情况" }
         ],
         "hideFollowing": true,
@@ -36,7 +36,7 @@
     },
     {
       "type": "paragraph",
-      "attrs": { "anchorId": "paragraph-a" },
+      "attrs": { "anchorId": "option-a" },
       "content": [{ "type": "text", "text": "这是选项 A 对应的文章段落。" }]
     }
   ]
@@ -59,6 +59,12 @@
 | `attrs.revealKey` | 标识该问题之后内容的解锁条件 | 同一篇文章内唯一，不同文章可复用 |
 
 `revealKey` 不是段落 ID、选项 ID、密码或请求资源接口的参数。一个问题下的不同选项共享该问题的 revealKey，但可以跳转到不同段落。
+
+新编辑器绑定规则为 `options[].id = options[].targetAnchorId = 目标段落.attrs.anchorId`。例如选项 ID 为 `AUV6gOa9`，绑定或显式转换后，段落就渲染为 `data-anchor-id="AUV6gOa9"`，可以在当前文章实例内直接用该选项 ID 定位。三个字段职责仍不同，协议保留 targetAnchorId，不把历史文章中的不相等判为无效。
+
+旧文章加载时不会自动迁移，UUID 格式锚点仍有效；需要在编辑器重新绑定或点击“使用选项 ID 作为锚点”，保存并重新加载 JSON 才会变成新值。为了兼容历史文章，渲染器的通用定位逻辑仍优先使用选项的 targetAnchorId；未绑定选项不应仅因为有 option.id 就擅自跳转。上述数据属性也不是 HTML id，不能直接使用 document.getElementById。
+
+锚点在文章内唯一：同 ID 的选项可以共享一个目标，不同段落不能同时占用该 ID。若新绑定会覆盖不同选项的现有目标或改变其他问题的跳转，编辑器会拒绝并提示处理冲突；这不会使旧版多选项共用段落的文章失效。
 
 ### 2.3 可选的标题上方图片
 
@@ -111,10 +117,10 @@ interface ResourceQuestionSelectEvent {
 
 1. 宿主把文章 JSON 和 `revealedKeys = []` 传给渲染器。
 2. 渲染器显示问题；因为 hideFollowing 为 true 且 `report-access` 不在列表中，问题后的段落暂不渲染。
-3. 用户点击 `option-a`，渲染器发出事件，携带 `questionId = question-1`、`resourceId = resource-123`、`optionId = option-a`、`revealKey = report-access` 和 `targetAnchorId = paragraph-a`。
+3. 用户点击 `option-a`，渲染器发出事件，携带 `questionId = question-1`、`resourceId = resource-123`、`optionId = option-a`、`revealKey = report-access` 和 `targetAnchorId = option-a`。
 4. 宿主执行业务判断。例如“选择即允许”可以直接通过，也可以先等待业务接口确认；这与按资源 ID 拉取问题数据是两回事。
 5. 业务允许后，宿主把收到的 `event.revealKey` 加入列表，再将新列表传给渲染器，此时为 `["report-access"]`。
-6. 渲染器重新计算可见内容并显示后续段落。等待框架完成渲染与布局后，再滚动到 `paragraph-a`。
+6. 渲染器重新计算可见内容并显示后续段落。等待框架完成渲染与布局后，再滚动到 `option-a`。
 7. 如需重新隐藏，宿主从列表移除 `report-access`，渲染器重新计算即可。
 
 核心规则：**点击选项只通知业务和请求定位，不由渲染器擅自解锁；宿主更新 revealedKeys 才代表允许显示。** 即使选项没有绑定目标，宿主仍可按业务规则解锁，只是不执行跳转。
@@ -252,6 +258,7 @@ function getVisibleContent(document, revealedKeys = []) {
 - [ ] 自动生成值和手动固定值使用相同的精确匹配规则；未知值无效。
 - [ ] 多隐藏模块符合第 4.2 节所有情况，后面的解锁不绕过前面的未解锁模块。
 - [ ] 可见目标直接定位；隐藏目标在业务允许且 DOM 就绪后定位；缺失/未绑定目标不错误跳转。
+- [ ] 新绑定的 option.id 可定位到同名 data-anchor-id；旧版 targetAnchorId 与 option.id 不一致时仍正确定位，不自动改写文章。
 - [ ] 异步失败、取消、连续点击、切换文章和卸载不会产生迟到解锁或错误滚动。
 - [ ] 多实例和同名固定 revealKey 的不同文章互不影响；切换文章不继承未明确恢复的解锁状态。
 - [ ] 重复身份报错、合法占位正常显示、纯文本被正确转义。

@@ -105,12 +105,110 @@ describe('resource snapshots and protocol', () => {
 })
 
 describe('paragraph binding identity', () => {
+  it('uses the external option ID as the anchor, including when converting a legacy UUID target', () => {
+    const value = article()
+    const id = 'AUV6gOa9'
+    value.content![0]!.attrs!.options = [{ id, label: '5分钟以内', targetAnchorId: 'paragraph-legacy' }]
+    value.content![1]!.attrs = { anchorId: 'paragraph-legacy' }
+    value.content!.push({ type: 'paragraph' }) // Keep StarterKit's trailing paragraph outside this history test.
+    const editor = core(value)
+    const before = toProtocolJSON(editor.getJSON() as ProseMirrorJSON)
+    // Importing an existing article does not silently migrate its anchors.
+    expect(before).toEqual(value)
+    const pos = paragraphTargets(editor.state.doc)[0]!.pos
+    expect(bindQuestionOption(editor, 'q1', id, pos)).toBe(true)
+    expect(paragraphTargets(editor.state.doc)[0]!.anchorId).toBe(id)
+    expect(findQuestion(editor.state.doc, 'q1')!.node.attrs.options[0]).toEqual({ id, label: '5分钟以内', targetAnchorId: id })
+    expect(editor.getHTML()).toContain('data-anchor-id="AUV6gOa9"')
+    expect(validateProtocolDocument(toProtocolJSON(editor.getJSON() as ProseMirrorJSON)).valid).toBe(true)
+    editor.commands.undo()
+    expect(toProtocolJSON(editor.getJSON() as ProseMirrorJSON)).toEqual(before)
+    editor.commands.redo()
+    expect(paragraphTargets(editor.state.doc)[0]!.anchorId).toBe(id)
+  })
+
+  it('moves an unshared option anchor to a new target atomically and can rebind after clearing', () => {
+    const value = article(); value.content!.push({ type: 'paragraph' })
+    const editor = core(value)
+    const [first, second] = paragraphTargets(editor.state.doc)
+    expect(bindQuestionOption(editor, 'q1', 'fast', first!.pos)).toBe(true)
+    const before = toProtocolJSON(editor.getJSON() as ProseMirrorJSON)
+    expect(bindQuestionOption(editor, 'q1', 'fast', second!.pos)).toBe(true)
+    expect(paragraphTargets(editor.state.doc).map(target => target.anchorId)).toEqual([null, 'fast', null])
+    expect(editor.state.doc.textContent).toContain('目标段落')
+    expect(findQuestion(editor.state.doc, 'q1')!.node.attrs.options[0].targetAnchorId).toBe('fast')
+    editor.commands.undo()
+    expect(toProtocolJSON(editor.getJSON() as ProseMirrorJSON)).toEqual(before)
+    editor.commands.redo()
+    bindQuestionOption(editor, 'q1', 'fast', null)
+    expect(bindQuestionOption(editor, 'q1', 'fast', first!.pos)).toBe(true)
+    expect(paragraphTargets(editor.state.doc).map(target => target.anchorId)).toEqual(['fast', null, null])
+  })
+
+  it('rejects a different option overwriting an already-bound paragraph without changing content or history', () => {
+    const editor = core()
+    const pos = paragraphTargets(editor.state.doc)[0]!.pos
+    bindQuestionOption(editor, 'q1', 'fast', pos)
+    const before = toProtocolJSON(editor.getJSON() as ProseMirrorJSON)
+    const error = vi.fn()
+    expect(bindQuestionOption(editor, 'q1', 'slow', pos, error)).toBe(false)
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('不能覆盖'))
+    expect(toProtocolJSON(editor.getJSON() as ProseMirrorJSON)).toEqual(before)
+    editor.commands.undo()
+    expect(paragraphTargets(editor.state.doc)[0]!.anchorId).toBeNull()
+  })
+
+  it('preserves same-ID shared links when migrating, but does not redirect another question when rebinding', () => {
+    const value = article()
+    value.content![0]!.attrs!.options = [{ id: 'fast', label: '选项', targetAnchorId: 'legacy' }]
+    const copy = structuredClone(value.content![0]!)
+    copy.attrs!.id = 'q2'; copy.attrs!.revealKey = 'unlock-q2'
+    value.content!.push(copy)
+    value.content![1]!.attrs = { anchorId: 'legacy' }
+    value.content!.push({ type: 'paragraph' })
+    const editor = core(value)
+    const before = toProtocolJSON(editor.getJSON() as ProseMirrorJSON)
+    const [first, second] = paragraphTargets(editor.state.doc)
+    expect(bindQuestionOption(editor, 'q1', 'fast', first!.pos)).toBe(true)
+    expect(findQuestion(editor.state.doc, 'q2')!.node.attrs.options[0].targetAnchorId).toBe('fast')
+    expect(paragraphTargets(editor.state.doc)[0]!.anchorId).toBe('fast')
+    const shared = toProtocolJSON(editor.getJSON() as ProseMirrorJSON)
+    const error = vi.fn()
+    expect(bindQuestionOption(editor, 'q2', 'fast', second!.pos, error)).toBe(false)
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('已被其他问题'))
+    expect(toProtocolJSON(editor.getJSON() as ProseMirrorJSON)).toEqual(shared)
+    editor.commands.undo()
+    expect(toProtocolJSON(editor.getJSON() as ProseMirrorJSON)).toEqual(before)
+  })
+
+  it('keeps legacy many-option targets unchanged when conversion would conflict', () => {
+    const value = article()
+    value.content![0]!.attrs!.options = data.options.map(option => ({ ...option, targetAnchorId: 'legacy' }))
+    value.content![1]!.attrs = { anchorId: 'legacy' }
+    const editor = core(value)
+    const error = vi.fn()
+    expect(validateProtocolDocument(value).valid).toBe(true)
+    expect(bindQuestionOption(editor, 'q1', 'fast', paragraphTargets(editor.state.doc)[0]!.pos, error)).toBe(false)
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('不能覆盖'))
+    expect(toProtocolJSON(editor.getJSON() as ProseMirrorJSON)).toEqual(value)
+  })
+
+  it('does not revive another question’s dangling reference by claiming its ID', () => {
+    const value = article()
+    const copy = question(); copy.attrs!.id = 'q2'; copy.attrs!.revealKey = 'unlock-q2'
+    copy.attrs!.options = [{ id: 'fast', label: '选项', targetAnchorId: 'fast' }]
+    value.content!.push(copy)
+    const editor = core(value)
+    expect(bindQuestionOption(editor, 'q1', 'fast', paragraphTargets(editor.state.doc)[0]!.pos)).toBe(false)
+    expect(toProtocolJSON(editor.getJSON() as ProseMirrorJSON)).toEqual(value)
+  })
+
   it('creates anchor and binding in one undoable transaction, then clears without removing the anchor', () => {
     const editor = core()
     const target = paragraphTargets(editor.state.doc)[0]!
     expect(bindQuestionOption(editor, 'q1', 'fast', target.pos)).toBe(true)
     const anchor = paragraphTargets(editor.state.doc)[0]!.anchorId
-    expect(anchor).toBeTruthy()
+    expect(anchor).toBe('fast')
     expect(findQuestion(editor.state.doc, 'q1')!.node.attrs.options[0].targetAnchorId).toBe(anchor)
     expect(editor.commands.undo()).toBe(true)
     expect(paragraphTargets(editor.state.doc)[0]!.anchorId).toBeNull()
@@ -191,6 +289,38 @@ describe('paragraph binding identity', () => {
 })
 
 describe('resource question component workflow', () => {
+  it('converts a legacy binding from the inspector and then locates by external option ID', async () => {
+    const value = article()
+    value.content![0]!.attrs!.options = [{ id: 'AUV6gOa9', label: '5分钟以内', targetAnchorId: 'paragraph-old' }]
+    value.content![1]!.attrs = { anchorId: 'paragraph-old' }
+    const { wrapper, editor, api } = await component({ modelValue: value })
+    selectNode(editor, 0); await settle()
+    expect(api.scrollToAnchor('AUV6gOa9')).toBe(false)
+    await wrapper.findAll('.resource-binding button').find(button => button.text() === '使用选项 ID 作为锚点')!.trigger('click')
+    await settle()
+    expect(api.getJSON().content![1]!.attrs!.anchorId).toBe('AUV6gOa9')
+    expect(wrapper.find('.article-editor [data-anchor-id="AUV6gOa9"]').text()).toBe('目标段落')
+    expect(api.scrollToAnchor('AUV6gOa9')).toBe(true)
+    expect(api.scrollToAnchor('paragraph-old')).toBe(false)
+    expect(wrapper.findAll('.resource-binding button').some(button => button.text() === '使用选项 ID 作为锚点')).toBe(false)
+    await wrapper.find('.resource-option').trigger('click')
+    expect(wrapper.find('.anchor-target-highlight').text()).toBe('目标段落')
+  })
+
+  it('shows binding conflicts and resets the native select rather than displaying an unsaved target', async () => {
+    const { wrapper, editor, api } = await component()
+    selectNode(editor, 0); await settle()
+    const target = paragraphTargets(editor.state.doc)[0]!.pos
+    await wrapper.find('select[aria-label="5分钟以内的目标段落"]').setValue(String(target))
+    const before = api.getJSON()
+    const conflicting = wrapper.find('select[aria-label="30分钟以上的目标段落"]')
+    await conflicting.setValue(String(target))
+    expect(api.getJSON()).toEqual(before)
+    expect((conflicting.element as HTMLSelectElement).value).toBe('')
+    expect(wrapper.emitted('error')?.at(-1)?.[0]).toMatchObject({ source: 'resourceQuestion', message: expect.stringContaining('不能覆盖') })
+    expect(wrapper.find('.toast-message').text()).toContain('不能覆盖')
+  })
+
   it('inserts from the extension group at top level even with a cursor inside a nested container', async () => {
     const { wrapper, editor, api } = await component({ modelValue: { type: 'doc', content: [{ type: 'blockquote', content: [{ type: 'paragraph', content: [{ type: 'text', text: '引用' }] }] }] } })
     editor.commands.setTextSelection(2)

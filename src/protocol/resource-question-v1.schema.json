@@ -24,7 +24,7 @@
             "properties": {
               "id": { "type": "string", "minLength": 1, "pattern": "\\S" },
               "label": { "type": "string", "minLength": 1, "pattern": "\\S" },
-              "targetAnchorId": { "type": "string", "minLength": 1, "pattern": "\\S" }
+              "targetAnchorId": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Target paragraph/heading anchorId. New editor bindings use this option's id; legacy anchor values remain supported." }
             }
           }
         },

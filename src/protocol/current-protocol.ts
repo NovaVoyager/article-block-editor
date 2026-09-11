@@ -5,7 +5,7 @@ import imageLayoutSchema from './image-layout-v1.schema.json'
 import resourceQuestionSchema from './resource-question-v1.schema.json'
 import resourceQuestionImageSchema from './resource-question-image-v1.schema.json'
 
-const anchorSchema = { type: 'string', minLength: 1, pattern: '\\S', description: 'Stable paragraph/heading anchor, unique within the article.' }
+const anchorSchema = { type: 'string', minLength: 1, pattern: '\\S', description: 'Stable paragraph/heading anchor, unique within the article. New resource option bindings use the external option ID; existing anchors remain valid.' }
 const anchorAttribute = { name: 'anchorId', type: 'string', required: false, description: anchorSchema.description }
 
 export const baseDocumentSchema = protocolDefinition.documentSchema
@@ -131,6 +131,7 @@ const currentProtocol = {
     identity: 'Question id, revealKey and paragraph/heading anchorId must each be unique within the document; option id must be unique within its question. Enforce these semantic checks in addition to JSON Schema.',
     draft: 'resourceId="" with empty title, description and options is an unconfigured placeholder. Render a neutral placeholder; never unlock automatically.',
     placement: 'resourceQuestion is allowed only as a direct child of doc.',
+    binding: 'New editor bindings set paragraph/heading anchorId and option.targetAnchorId to option.id. Existing documents are not automatically migrated; explicitly rebind/convert to use the option ID. Renaming a target with different-option references or relocating a key referenced by another question is rejected without changing data. Unshared option anchors may move to a new target atomically. Same-ID references to a renamed legacy target are updated together. Clearing a binding keeps its anchor; copies receive fresh anchors. Always preserve targetAnchorId for legacy compatibility.',
     navigation: 'Match the selected option.targetAnchorId to a paragraph or heading in this article instance. Missing/unbound targets do not navigate. After business-controlled reveal, wait for layout before scrolling.',
     visibility: 'Scan top-level nodes in order. Include a resourceQuestion, then stop if hideFollowing=true and its revealKey is absent from the host-supplied revealed keys. Recompute from the original document when keys change. Clicking an option does not automatically unlock.',
     security: 'Visibility is presentation only, not authorization. Hidden article data remains in the JSON; sensitive data must be protected on the server.',

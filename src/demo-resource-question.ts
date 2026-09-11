@@ -17,11 +17,11 @@ export function resourceQuestionDemo(): ProseMirrorJSON {
     { type: 'paragraph', content: [{ type: 'text', text: '点击问题卡片右下方的“更换资源问题”可体验外部选择组件；点击选项会定位并高亮对应段落。右侧可重新绑定目标。' }] },
     { type: 'resourceQuestion', attrs: {
       id: 'demo-question', ...JSON.parse(JSON.stringify(demoQuestions[0])),
-      options: demoQuestions[0]!.options.map((option, index) => ({ ...option, targetAnchorId: `sleep-advice-${index}` })),
+      options: demoQuestions[0]!.options.map(option => ({ ...option, targetAnchorId: option.id })),
       hideFollowing: true, revealKey: 'sleep-report',
     } },
     ...demoQuestions[0]!.options.flatMap((option, index): ProseMirrorJSON[] => [
-      { type: 'heading', attrs: { level: 2, anchorId: `sleep-advice-${index}` }, content: [{ type: 'text', text: `建议 ${index + 1}：${option.label}` }] },
+      { type: 'heading', attrs: { level: 2, anchorId: option.id }, content: [{ type: 'text', text: `建议 ${index + 1}：${option.label}` }] },
       ...Array.from({ length: 3 }, (_, line): ProseMirrorJSON => ({ type: 'paragraph', content: [{ type: 'text', text: `这是第 ${index + 1} 组演示内容（${line + 1}）。这里仅用于测试定位，不是睡眠诊断或医疗建议。你可以修改文字、移动段落，已配置的锚点不会随文字和顺序变化。` }] })),
     ]),
   ] }

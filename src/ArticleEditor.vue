@@ -357,7 +357,10 @@ function openResourcePicker(id?: string) {
 
 function bindSelectedOption(optionId: string, targetPos: number | null) {
   if (!editor.value || isReadonly.value || selected.value?.node.type.name !== 'resourceQuestion') return
-  if (!bindQuestionOption(editor.value, selected.value.node.attrs.id, optionId, targetPos)) showToast('目标已变化，请重新选择段落', 'error')
+  bindQuestionOption(editor.value, selected.value.node.attrs.id, optionId, targetPos, message => {
+    showToast(message, 'error')
+    emit('error', { source: 'resourceQuestion', message, errors: [message] })
+  })
 }
 
 function scrollToAnchor(anchorId: string): boolean {

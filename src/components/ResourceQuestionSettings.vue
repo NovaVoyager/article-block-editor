@@ -18,10 +18,15 @@ function optionsFor(anchor?: string) {
   const current = targetFor(anchor)
   return current && !filtered.value.includes(current) ? [current, ...filtered.value] : filtered.value
 }
-function bind(optionId: string, event: Event) {
-  const value = (event.target as HTMLSelectElement).value
+async function bind(optionId: string, event: Event) {
+  const input = event.target as HTMLSelectElement
+  const value = input.value
   if (value === 'missing') return
   emit('bind', optionId, value === '' ? null : Number(value))
+  await nextTick()
+  // Native selects otherwise keep a rejected value visible although JSON was not changed.
+  const anchor = props.question.options.find(option => option.id === optionId)?.targetAnchorId
+  input.value = String(targetFor(anchor)?.pos ?? (anchor ? 'missing' : ''))
 }
 async function updateRevealKey(event: Event) {
   const input = event.target as HTMLInputElement
@@ -56,9 +61,11 @@ async function updateImageSource(event: Event) {
     <label class="field-label"><span>问题名</span><input :value="question.title" readonly /></label>
     <label class="field-label"><span>问题描述</span><textarea :value="question.description" readonly rows="3" /></label>
     <h3>选项跳转段落</h3>
+    <p class="resource-help">新绑定使用选项 ID 作为段落锚点。旧绑定可重新选择目标或点击“使用选项 ID 作为锚点”转换；冲突时保留原绑定。</p>
     <label class="field-label"><span>搜索正文或标题</span><input v-model="search" type="search" placeholder="输入目标段落文字" /></label>
     <div v-for="option in question.options" :key="option.id" class="resource-binding">
       <strong>{{ option.label }}</strong><small>选项 ID：{{ option.id }}</small>
+      <small v-if="option.targetAnchorId">目标锚点：{{ option.targetAnchorId }}</small>
       <label class="field-label">
         <span>目标段落</span>
         <select :aria-label="`${option.label}的目标段落`" :disabled="readonly" :value="targetFor(option.targetAnchorId)?.pos ?? (option.targetAnchorId ? 'missing' : '')" @change="bind(option.id, $event)">
@@ -71,6 +78,7 @@ async function updateImageSource(event: Event) {
       <div class="resource-binding-actions">
         <button class="action-button ghost" type="button" :disabled="!targetFor(option.targetAnchorId)" @click="emit('navigate', option.targetAnchorId)">定位查看</button>
         <button class="action-button ghost" type="button" :disabled="readonly || !option.targetAnchorId" @click="emit('bind', option.id, null)">清除绑定</button>
+        <button v-if="option.targetAnchorId && option.targetAnchorId !== option.id && targetFor(option.targetAnchorId)" class="action-button ghost" type="button" :disabled="readonly" @click="emit('bind', option.id, targetFor(option.targetAnchorId)!.pos)">使用选项 ID 作为锚点</button>
       </div>
     </div>
     <p v-if="!question.options.length" class="resource-help">选择资源后即可为每个选项绑定目标段落。</p>
