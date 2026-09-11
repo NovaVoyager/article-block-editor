@@ -1,7 +1,13 @@
 import type { ArticleEditorProps, ArticleEditorExpose, ArticleEditorError, ImageUploadHandler, ImageUploadContext, ImageUploadResult } from 'article-block-editor'
-import type { ResourceQuestionData, ResourceQuestionPickerScope } from 'article-block-editor'
+import type { ResourceQuestionData, ResourceQuestionImage, ResourceQuestionPickerScope } from 'article-block-editor'
 import { getCurrentProtocol } from 'article-block-editor'
 const resource: ResourceQuestionData = { resourceId: 'q', title: '问题', description: '', options: [{ id: 'a', label: '选项' }] }
+const resourceImage: ResourceQuestionImage = { src: '/resource.png', alt: '配图', width: 960, height: 360 }
+const resourceWithImage: ResourceQuestionData = { ...resource, image: resourceImage }
+void resourceWithImage
+// @ts-expect-error A question image requires src.
+const invalidResourceImage: ResourceQuestionImage = { alt: 'missing source' }
+void invalidResourceImage
 function selectResource(scope: ResourceQuestionPickerScope) {
   const accepted: boolean = scope.select(resource)
   // @ts-expect-error Resource options require an external string ID.

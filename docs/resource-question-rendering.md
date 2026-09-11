@@ -25,6 +25,7 @@
         "resourceId": "resource-123",
         "title": "你的入睡时间是多久？",
         "description": "选择一个选项查看文章中的对应内容",
+        "image": { "src": "/images/sleep-question.png", "alt": "睡眠问题配图", "width": 960, "height": 360 },
         "options": [
           { "id": "option-a", "label": "5 分钟以内", "targetAnchorId": "paragraph-a" },
           { "id": "option-b", "label": "其他情况" }
@@ -58,6 +59,16 @@
 | `attrs.revealKey` | 标识该问题之后内容的解锁条件 | 同一篇文章内唯一，不同文章可复用 |
 
 `revealKey` 不是段落 ID、选项 ID、密码或请求资源接口的参数。一个问题下的不同选项共享该问题的 revealKey，但可以跳转到不同段落。
+
+### 2.3 可选的标题上方图片
+
+资源问题新增可选 `attrs.image: { src, alt?, title?, width?, height? }`。它是随文章保存的图片快照，可能来自资源数据，也可能由编辑器内单独上传替换；渲染器不需要区分来源或请求资源 API，只加载保存的图片地址。
+
+渲染顺序为：图片（若有）→ 问题名 → 问题描述 → 答案选项。省略 image 时不创建图片节点、不预留图片间距，完全兼容旧文章。没有图片时导出 JSON 不保存 image 字段，不使用空 src 或 null 表示图片。
+
+`src` 必填，`alt`/`title` 为可选字符串，`width`/`height` 为可选的 1～10000 整数。绑定 img 的 src、alt、title 及可选尺寸；图片最大宽度为容器宽度，高度等比例缩放，例如 `display: block; max-width: 100%; height: auto; margin: 0 auto 18px`。有尺寸时应预留等比例空间以减少段落跳转后的布局偏移，不用固定大高度或 object-fit: cover 裁切图片。图片加载失败应提供合理替代提示，不影响问题选项与解锁逻辑。
+
+同一问题只能保存一张顶部图片。图片不带新的跳转或解锁标识，image 的变更也不影响原有 revealKey 和 targetAnchorId。若渲染器按节点属性白名单读取数据，请同步允许 image 及其字段；按下载协议里的 `resourceQuestionImage` 定义校验，不将图片属性直接作为任意 HTML 注入。
 
 ## 3. revealKey 的执行逻辑
 
@@ -234,6 +245,7 @@ function getVisibleContent(document, revealedKeys = []) {
 
 - [ ] 旧版文章、无问题模块或全部关闭 hideFollowing 时，正常显示全文。
 - [ ] 根据保存快照展示问题，不请求资源接口；外部数据修改不影响已保存文章。
+- [ ] 有 image 时等比例显示在标题上方，无 image 时不留空白；加载失败不阻断选项。大图缩放不裁切、不产生固定高度留白。
 - [ ] 初始 revealedKeys 为空时，显示到首个未解锁问题（含问题自身）。
 - [ ] 选项事件携带正确的问题、资源、选项、解锁标识及可选目标；相同文案的不同选项仍能区分。
 - [ ] 点击选项不会自行解锁；宿主传入匹配值才显示，移除匹配值后重新隐藏。
@@ -247,7 +259,7 @@ function getVisibleContent(document, revealedKeys = []) {
 
 ## 8. 交给渲染器开发者 / AI 的任务说明
 
-可复制以下说明，并同时提供本文、下载的最新协议文件及一份真实文章 JSON：
+可复制以下说明，并同时提供本文、下载的最新协议文件及一份真实文章 JSON；包含图片时还需实现第 2.3 节的标题上方图片渲染：
 
 > 请在独立渲染器项目中按《资源问题：独立渲染器实现说明 v1》实现 resourceQuestion。问题数据使用 JSON attrs 快照，不调用资源接口。实现由宿主控制的 revealedKeys 输入和携带 revealKey、targetAnchorId 的选项事件；按顶层顺序在首个未解锁问题后停止渲染。选项点击不自动解锁，宿主业务允许后更新列表，渲染器等待 DOM 与布局就绪再定位目标段落。实现实例内锚点注册、异步及文章切换隔离、取消待定位入口，并通过文档中的验收清单。使用最新协议校验，兼容旧文章；不要把编辑器只读预览当作业务渲染器，不要将隐藏视为安全鉴权。
 

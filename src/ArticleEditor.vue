@@ -232,6 +232,11 @@ function replaceSelectedImage(files: File[]) {
   void uploadManager()?.upload(files, { kind: 'replace', pos: selected.value.pos })
 }
 
+function uploadQuestionImage(files: File[]) {
+  if (!selected.value || selected.value.node.type.name !== 'resourceQuestion' || isReadonly.value) return
+  void uploadManager()?.upload(files, { kind: 'resourceQuestion', questionId: selected.value.node.attrs.id })
+}
+
 function isFileDrag(event: DragEvent) {
   return Array.from(event.dataTransfer?.types ?? []).includes('Files') || Boolean(event.dataTransfer?.files.length)
 }
@@ -294,7 +299,12 @@ function patchSelectedNode(attributes: Record<string, unknown>) {
   if (selected.value.node.type.name === 'resourceQuestion') {
     const tr = closeHistory(editor.value.state.tr).setNodeMarkup(selected.value.pos, undefined, { ...selected.value.node.attrs, ...attributes })
     const result = validateProtocolDocument(toProtocolJSON(tr.doc.toJSON() as ProseMirrorJSON))
-    if (!result.valid) { showToast('设置未应用：解锁标识须非空且在文章内唯一', 'error'); return }
+    if (!result.valid) {
+      showToast('设置未应用：请检查图片属性及解锁标识（非空且唯一）', 'error')
+      emit('error', { source: 'resourceQuestion', message: '资源问题属性不符合协议', errors: result.errors })
+      return
+    }
+    if ('image' in attributes) imageUploads?.cancelQuestion(selected.value.node.attrs.id)
     editor.value.view.dispatch(tr)
     return
   }
@@ -327,7 +337,8 @@ function openResourcePicker(id?: string) {
           const previous = old.resourceId === snapshot.resourceId ? old.options.find(item => item.id === option.id) : undefined
           return { ...option, ...(previous?.targetAnchorId && { targetAnchorId: previous.targetAnchorId }) }
         })
-        const tr = closeHistory(currentEditor.state.tr).setNodeMarkup(target.pos, undefined, { ...old, ...snapshot, options })
+        const tr = closeHistory(currentEditor.state.tr).setNodeMarkup(target.pos, undefined, { ...old, ...snapshot, image: snapshot.image ?? null, options })
+        imageUploads?.cancelQuestion(questionId)
         currentEditor.view.dispatch(tr)
         closeResourcePicker()
         showToast('资源快照已保存到模块属性', 'success')
@@ -593,6 +604,7 @@ defineExpose(api)
         @remove="removeSelectedNode"
         @table-command="runTableCommand"
         @upload-image="replaceSelectedImage"
+        @upload-question-image="uploadQuestionImage"
         @pair-images="pairSelectedImage"
       />
     </main>

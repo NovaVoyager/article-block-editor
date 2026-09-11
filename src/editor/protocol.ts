@@ -86,6 +86,7 @@ function sanitizeNode(node: ProseMirrorJSON): ProseMirrorJSON {
       const attrs = node.attrs ?? {}
       return { type: 'resourceQuestion', attrs: {
         id: attrs.id, resourceId: attrs.resourceId, title: attrs.title, description: attrs.description,
+        ...(attrs.image != null && { image: { ...attrs.image as Record<string, unknown> } }),
         options: ((attrs.options ?? []) as ResourceQuestionOption[]).map(option => ({
           id: option.id, label: option.label, ...(option.targetAnchorId && { targetAnchorId: option.targetAnchorId }),
         })),

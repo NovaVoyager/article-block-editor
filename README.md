@@ -8,6 +8,8 @@
 
 顶部“资源问题示例”可体验完整编辑流程。编辑器始终显示全文，独立渲染器由其他项目实现。
 
+资源问题支持可选的标题上方图片 `attrs.image`：资源选择器可返回 `image: { src, alt?, title?, width?, height? }`，右侧也可通过现有 `uploadImage` 回调单独上传替换、填写地址或移除。图片等比例适应容器，不裁切。重新选择资源会同步其图片（未提供则清空）；旧文档无需增加字段。下载协议及下方接入/渲染文档已同步说明。
+
 - [资源选择组件接入说明](docs/resource-question-integration.md)
 - [独立渲染器实现说明：revealKey、段落跳转与验收清单](docs/resource-question-rendering.md)（可直接交给渲染器开发者或 AI）
 

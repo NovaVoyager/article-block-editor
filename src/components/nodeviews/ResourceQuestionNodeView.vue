@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
 import { CircleHelp, GripVertical } from '@lucide/vue'
 import type { ResourceQuestionAttrs } from '../../editor/resource-question'
 const props = defineProps(nodeViewProps)
 const question = computed(() => props.node.attrs as ResourceQuestionAttrs)
+const imageFailed = ref(false)
+watch(() => question.value.image?.src, () => { imageFailed.value = false })
 function choose() {
   if (!props.editor.isEditable) return
   const pos = props.getPos()
@@ -17,6 +19,8 @@ function choose() {
   <NodeViewWrapper class="resource-question-node" :class="{ 'is-selected': selected }" data-type="resource-question" :data-question-id="question.id">
     <button v-if="editor.isEditable" class="node-grip" type="button" data-drag-handle aria-label="拖动资源问题模块"><GripVertical :size="16" /></button>
     <div class="resource-question-card" contenteditable="false">
+      <img v-if="question.image && !imageFailed" class="resource-question-image" :src="question.image.src" :alt="question.image.alt ?? ''" :title="question.image.title" :width="question.image.width" :height="question.image.height" draggable="false" @error="imageFailed = true" />
+      <p v-else-if="question.image" class="resource-image-error" role="status">问题图片加载失败，请检查图片地址</p>
       <h3><CircleHelp :size="24" aria-hidden="true" />{{ question.title || '请选择资源问题' }}</h3>
       <p v-if="question.description" class="resource-description">{{ question.description }}</p>
       <div class="resource-options">

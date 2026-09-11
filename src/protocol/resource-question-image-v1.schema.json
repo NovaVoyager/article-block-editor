@@ -1,0 +1,18 @@
+{
+  "$id": "urn:article-content-protocol:resource-question-image:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["src"],
+  "description": "Optional image snapshot above the resource question title. Omit the image attribute when absent. Fit container width with proportional height, without cropping.",
+  "properties": {
+    "src": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!.*[\\u0000-\\u0020\\u007f\\\\])(?:(?:[hH][tT][tT][pP][sS]?:)?//[^/?#]+\\S*|(?!(?:[a-zA-Z][a-zA-Z0-9+.-]*):)\\S+|data:image/(?:png|jpeg|webp|gif|avif|bmp);base64,[a-zA-Z0-9+/=]+)$"
+    },
+    "alt": { "type": "string" },
+    "title": { "type": "string" },
+    "width": { "type": "integer", "minimum": 1, "maximum": 10000 },
+    "height": { "type": "integer", "minimum": 1, "maximum": 10000 }
+  }
+}

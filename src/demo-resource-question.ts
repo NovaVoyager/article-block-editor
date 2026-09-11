@@ -1,7 +1,8 @@
 import type { ProseMirrorJSON, ResourceQuestionData } from './index'
 
 export const demoQuestions: ResourceQuestionData[] = [
-  { resourceId: 'sleep-check', title: '🌙 你的入睡时间是多久？', description: '选择符合你的情况，查看对应的睡眠建议。', options: [
+  { resourceId: 'sleep-check', title: '🌙 你的入睡时间是多久？', description: '选择符合你的情况，查看对应的睡眠建议。',
+    image: { src: 'https://placehold.co/960x360/DED8FA/302D64?text=Resource+Question', alt: '资源问题配图示例', width: 960, height: 360 }, options: [
     { id: 'within-5', label: '😴 5 分钟以内' }, { id: 'within-30', label: '🌛 10～30 分钟' },
     { id: 'over-30', label: '💭 超过 30 分钟' },
   ] },

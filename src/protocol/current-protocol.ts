@@ -3,6 +3,7 @@ import textFormattingSchema from './text-formatting-v1.schema.json'
 import fontSizeSchema from './paragraph-font-size-v1.schema.json'
 import imageLayoutSchema from './image-layout-v1.schema.json'
 import resourceQuestionSchema from './resource-question-v1.schema.json'
+import resourceQuestionImageSchema from './resource-question-image-v1.schema.json'
 
 const anchorSchema = { type: 'string', minLength: 1, pattern: '\\S', description: 'Stable paragraph/heading anchor, unique within the article.' }
 const anchorAttribute = { name: 'anchorId', type: 'string', required: false, description: anchorSchema.description }
@@ -23,6 +24,7 @@ export const currentDocumentSchema = {
   definitions: {
     ...baseDocumentSchema.definitions,
     resourceQuestion: resourceQuestionSchema,
+    resourceQuestionImage: resourceQuestionImageSchema,
     heading: {
       ...baseDocumentSchema.definitions.heading,
       properties: {
@@ -117,12 +119,15 @@ const currentProtocol = {
   }), {
     type: 'resourceQuestion', description: 'Top-level resource question snapshot. Rendering never fetches resource data.',
     attributes: Object.entries(resourceQuestionSchema.properties.attrs.properties).map(([name, schema]) => ({
-      name, type: schema.type, required: true, description: `See documentSchema.definitions.resourceQuestion.properties.attrs.properties.${name}`,
+      name, type: 'type' in schema ? schema.type : 'object',
+      required: resourceQuestionSchema.properties.attrs.required.includes(name),
+      description: `See documentSchema.definitions.resourceQuestion.properties.attrs.properties.${name}`,
     })),
     render: { mode: 'component', element: 'resource-question' },
   }],
   resourceQuestionRules: {
     data: 'Save the selected resourceId, title, description and options as a snapshot. Option IDs are stable strings supplied by the resource. Do not fetch on render.',
+    image: 'Optional attrs.image={src,alt?,title?,width?,height?} is a snapshot from the resource or a separate upload. Render it above the title, fit width to the container and preserve aspect ratio without cropping. Omit when absent; older documents need no image. Selecting a resource replaces the image (omission clears it); uploading only replaces image, not question/bindings/gate settings.',
     identity: 'Question id, revealKey and paragraph/heading anchorId must each be unique within the document; option id must be unique within its question. Enforce these semantic checks in addition to JSON Schema.',
     draft: 'resourceId="" with empty title, description and options is an unconfigured placeholder. Render a neutral placeholder; never unlock automatically.',
     placement: 'resourceQuestion is allowed only as a direct child of doc.',

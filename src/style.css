@@ -1179,6 +1179,18 @@
   line-height: 1.4;
 }
 .article-studio .resource-question-card h3 svg { flex: 0 0 auto; }
+.article-studio .resource-question-card .resource-question-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto 18px;
+  border-radius: 10px;
+}
+.article-studio .resource-question-card .resource-image-error { margin: 0 0 18px; color: #8f3b36; font: 12px/1.6 sans-serif; }
+.article-studio .resource-image-settings { margin-bottom: 18px; }
+.article-studio .resource-image-settings .image-file-picker,
+.article-studio .resource-image-settings .image-file-picker button { width: 100%; }
+.article-studio .resource-image-remove { margin-top: 10px; }
 .article-studio .resource-question-card .resource-description {
   margin: 0 0 18px;
   color: #4e4a68;

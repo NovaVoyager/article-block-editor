@@ -6,4 +6,4 @@ export { toProtocolJSON, validateProtocolDocument, validateProtocolV1Document } 
 export type { ArticleEditorProps, ArticleEditorExpose, ArticleEditorError } from './editor/public-types'
 export type { ImageUploadHandler, ImageUploadContext, ImageUploadResult } from './editor/public-types'
 export type { ProseMirrorJSON, MarkJSON, ValidationResult } from './editor/types'
-export type { ResourceQuestionData, ResourceQuestionAttrs, ResourceQuestionOption, ResourceQuestionPickerScope } from './editor/resource-question'
+export type { ResourceQuestionData, ResourceQuestionAttrs, ResourceQuestionImage, ResourceQuestionOption, ResourceQuestionPickerScope } from './editor/resource-question'

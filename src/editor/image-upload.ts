@@ -3,13 +3,14 @@ import type { Transaction } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
 import type { ImageUploadHandler, ImageUploadResult } from './public-types'
 import { validateProtocolDocument } from './protocol'
+import { findQuestion, snapshotQuestionImage } from './resource-question'
 
 export const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'image/bmp']
 export const IMAGE_ACCEPT = IMAGE_MIME_TYPES.join(',')
 export const DEFAULT_MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
-type Target = { kind: 'insert' | 'replace'; pos: number }
-type Job = Target & { file: File; controller: AbortController }
+type Target = { kind: 'insert' | 'replace'; pos: number } | { kind: 'resourceQuestion'; questionId: string }
+type Job = Target & { file: File; controller: AbortController; imageBefore?: string }
 
 export function imageFileError(file: File, maximum: number): string | null {
   if (!IMAGE_MIME_TYPES.includes(file.type.toLowerCase())) return '仅支持 PNG、JPEG、WebP、GIF、AVIF、BMP 图片'
@@ -58,9 +59,24 @@ export function createImageUploadManager(editor: Editor, options: {
     for (const job of jobs) cancel(job)
     updatePending()
   }
+  function cancelQuestion(questionId: string) {
+    for (const job of jobs) {
+      if (job.kind === 'resourceQuestion' && job.questionId === questionId) cancel(job)
+    }
+    updatePending()
+  }
   function mapTargets({ transaction }: { transaction: Transaction }) {
     if (!transaction.docChanged) return
     for (const job of jobs) {
+      if (job.kind === 'resourceQuestion') {
+        // Stable identity follows moves, never the selection or a copied module.
+        const target = findQuestion(transaction.doc, job.questionId)
+        if (!target || JSON.stringify(target.node.attrs.image ?? null) !== job.imageBefore) {
+          cancel(job)
+          options.onError('问题图片上传目标已被删除或修改，请重新上传', job.file)
+        }
+        continue
+      }
       const mapped = transaction.mapping.mapResult(job.pos, 1)
       if (mapped.deleted || (job.kind === 'replace' && transaction.doc.nodeAt(mapped.pos)?.type.name !== 'image')) {
         cancel(job)
@@ -81,10 +97,17 @@ export function createImageUploadManager(editor: Editor, options: {
       return
     }
     const batch: Job[] = []
-    for (const file of target.kind === 'replace' ? files.slice(0, 1) : files) {
+    for (const file of target.kind === 'insert' ? files : files.slice(0, 1)) {
       const error = imageFileError(file, options.getMaximum())
       if (error) { options.onError(error, file); continue }
-      const job = { ...target, file, controller: new AbortController() }
+      const question = target.kind === 'resourceQuestion' ? findQuestion(editor.state.doc, target.questionId) : undefined
+      if (target.kind === 'resourceQuestion') {
+        if (!question) { options.onError('资源问题已不存在，请重新选择', file); continue }
+        cancelQuestion(target.questionId)
+      }
+      const job: Job = { ...target, file, controller: new AbortController(),
+        ...(question && { imageBefore: JSON.stringify(question.node.attrs.image ?? null) }),
+      }
       jobs.add(job)
       batch.push(job)
     }
@@ -96,17 +119,23 @@ export function createImageUploadManager(editor: Editor, options: {
         const result = await handler(job.file, { signal: job.controller.signal })
         if (!jobs.has(job) || disposed || editor.isDestroyed || options.isReadonly()) continue
         const attrs = uploadedAttributes(result, job.file)
-        const node = editor.state.doc.nodeAt(job.pos)
+        const question = job.kind === 'resourceQuestion' ? findQuestion(editor.state.doc, job.questionId) : undefined
+        const pos = job.kind === 'resourceQuestion' ? question?.pos : job.pos
+        if (pos === undefined) throw new Error('资源问题已不存在，请重新上传')
+        const node = editor.state.doc.nodeAt(pos)
+        const image = job.kind === 'resourceQuestion' ? snapshotQuestionImage(attrs as unknown as ImageUploadResult) : undefined
         if (job.kind === 'replace' && node?.type.name !== 'image') throw new Error('原图片已不存在，请重新上传')
         // Remove this job before dispatch so its own node replacement cannot cancel itself.
         jobs.delete(job)
         const transaction = closeHistory(editor.state.tr)
-        if (job.kind === 'replace' && node) {
-          transaction.setNodeMarkup(job.pos, undefined, {
+        if (job.kind === 'resourceQuestion' && node && image) {
+          transaction.setNodeMarkup(pos, undefined, { ...node.attrs, image })
+        } else if (job.kind === 'replace' && node) {
+          transaction.setNodeMarkup(pos, undefined, {
             ...node.attrs, width: null, height: null, title: null, ...attrs,
           })
         } else {
-          transaction.insert(job.pos, editor.schema.nodes.image!.create({ imageAlign: 'center', ...attrs }))
+          transaction.insert(pos, editor.schema.nodes.image!.create({ imageAlign: 'center', ...attrs }))
         }
         editor.view.dispatch(transaction)
         // Keep subsequent typing out of this upload's undo group as well.
@@ -124,6 +153,7 @@ export function createImageUploadManager(editor: Editor, options: {
   return {
     upload,
     cancelAll,
+    cancelQuestion,
     get pending() { return jobs.size },
     destroy() { disposed = true; cancelAll(); editor.off('transaction', mapTargets) },
   }

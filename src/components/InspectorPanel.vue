@@ -37,6 +37,7 @@ const emit = defineEmits<{
   remove: []
   tableCommand: [command: TableCommand]
   uploadImage: [files: File[]]
+  uploadQuestionImage: [files: File[]]
   pairImages: []
   chooseResource: []
   bindOption: [optionId: string, targetPos: number | null]
@@ -264,6 +265,7 @@ function setButtonStyle(event: Event) {
       </section>
 
       <ResourceQuestionSettings v-if="type === 'resourceQuestion'" :question="attrs as unknown as ResourceQuestionAttrs" :targets="paragraphTargets ?? []" :readonly="readonly"
+        :can-upload="canUpload" :uploading="uploading" @upload="emit('uploadQuestionImage', $event)"
         @choose="emit('chooseResource')" @bind="(optionId, pos) => emit('bindOption', optionId, pos)" @navigate="emit('navigateAnchor', $event)" @patch="emit('patch', $event)" />
 
       <section v-if="type === 'orderedList'" class="property-section">

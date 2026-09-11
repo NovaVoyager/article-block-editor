@@ -7,7 +7,7 @@ import { DOMParser, DOMSerializer } from '@tiptap/pm/model'
 import { closeHistory } from '@tiptap/pm/history'
 import Ajv from 'ajv'
 import ArticleEditor from './ArticleEditor.vue'
-import type { ArticleEditorExpose, ArticleEditorProps } from './editor/public-types'
+import type { ArticleEditorExpose, ArticleEditorProps, ImageUploadHandler, ImageUploadResult } from './editor/public-types'
 import type { ProseMirrorJSON } from './editor/types'
 import { createProtocolExtensions } from './editor/extensions'
 import { bindQuestionOption, createResourceQuestion, findQuestion, paragraphTargets, snapshotResourceQuestion, type ResourceQuestionData, type ResourceQuestionPickerScope } from './editor/resource-question'
@@ -304,5 +304,190 @@ describe('resource question component workflow', () => {
     await reveal.setValue('')
     expect(api.getJSON().content![0]!.attrs!.revealKey).toBe('custom-key')
     expect((reveal.element as HTMLInputElement).value).toBe('custom-key')
+  })
+})
+
+const questionImage = { src: '/question.png', alt: '问题配图', title: '配图标题', width: 1200, height: 450 }
+function imageArticle() {
+  const value = article()
+  value.content![0]!.attrs!.image = { ...questionImage }
+  return value
+}
+function deferredImage() {
+  let resolve!: (value: string | ImageUploadResult) => void
+  const promise = new Promise<string | ImageUploadResult>(done => { resolve = done })
+  return { resolve, promise }
+}
+async function chooseQuestionImage(wrapper: ReturnType<typeof mount>, files = [new File(['image'], 'cover.png', { type: 'image/png' })]) {
+  const input = wrapper.find('input[aria-label="上传问题图片文件"]')
+  Object.defineProperty(input.element, 'files', { configurable: true, value: files })
+  await input.trigger('change')
+  await settle()
+}
+
+describe('resource question image snapshot', () => {
+  it('keeps image optional, validates downloaded metadata, and round-trips image through JSON and clipboard HTML', () => {
+    expect(toProtocolJSON(core(article()).getJSON() as ProseMirrorJSON)).toEqual(article())
+    const value = imageArticle()
+    const editor = core(value)
+    expect(toProtocolJSON(editor.getJSON() as ProseMirrorJSON)).toEqual(value)
+    const protocol = getCurrentProtocol()
+    expect(protocol.nodes.find(node => node.type === 'resourceQuestion')?.attributes).toContainEqual(expect.objectContaining({ name: 'image', type: 'object', required: false }))
+    const check = new Ajv({ strict: false }).compile(protocol.documentSchema)
+    expect(check(value)).toBe(true)
+    const schema = getSchema(createProtocolExtensions())
+    const container = document.createElement('div')
+    container.append(DOMSerializer.fromSchema(schema).serializeFragment(editor.state.doc.content))
+    expect(container.querySelector('section')?.firstElementChild?.tagName).toBe('IMG')
+    expect(container.querySelector('img')?.getAttribute('alt')).toBe(questionImage.alt)
+    expect(toProtocolJSON(DOMParser.fromSchema(schema).parse(container).toJSON())).toEqual(value)
+    const source = { ...data, image: { ...questionImage, extra: 'not saved' } }
+    const snapshot = snapshotResourceQuestion(source)
+    source.image.src = '/external-mutation.png'
+    expect(snapshot.image).toEqual(questionImage)
+    expect(snapshotResourceQuestion({ ...data, image: null }).image).toBeUndefined()
+  })
+
+  it.each([
+    { src: '' }, { src: 'javascript:alert(1)' }, { src: 'blob:https://example.com/temporary' },
+    { src: 'data:image/svg+xml;base64,PHN2Zz4=' }, { src: '/has space.png' },
+    { src: '/ok.png', width: 0 }, { src: '/ok.png', height: 10001 },
+    { src: '/ok.png', alt: 2 }, { src: '/ok.png', width: 1.5 },
+  ])('rejects invalid snapshot image %j before it is rendered', image => {
+    const value = article(); value.content![0]!.attrs!.image = image
+    expect(validateProtocolDocument(value).valid).toBe(false)
+    expect(() => snapshotResourceQuestion({ ...data, image: image as ImageUploadResult })).toThrow('问题图片')
+  })
+
+  it.each(['/images/q.png', './q.png', '../q.png', 'https://example.com/q.png', '//example.com/q.png', 'data:image/png;base64,aGVsbG8='])('accepts persistent image source %s', src => {
+    const value = article(); value.content![0]!.attrs!.image = { src }
+    expect(validateProtocolDocument(value).valid).toBe(true)
+  })
+
+  it('takes a detached image from the host picker and clears it when reselecting a resource without an image', async () => {
+    const { wrapper, editor, api, scope } = await component()
+    bindQuestionOption(editor, 'q1', 'fast', paragraphTargets(editor.state.doc)[0]!.pos)
+    const before = api.getJSON().content![0]!.attrs!
+    await wrapper.find('.resource-choose').trigger('click')
+    expect(scope().select({ ...data, image: { src: 'javascript:bad' } })).toBe(false)
+    const source = { ...data, image: { ...questionImage } }
+    expect(scope().select(source)).toBe(true)
+    source.image.src = '/not-saved.png'
+    await settle()
+    expect(api.getJSON().content![0]!.attrs).toEqual({ ...before, image: questionImage })
+    expect(wrapper.find('.resource-question-card').element.firstElementChild?.tagName).toBe('IMG')
+    expect(wrapper.find('.resource-question-image').attributes('src')).toBe(questionImage.src)
+    await wrapper.find('.resource-choose').trigger('click')
+    expect(scope().current.image).toEqual(questionImage)
+    expect(scope().select(data)).toBe(true)
+    await settle()
+    expect(api.getJSON().content![0]!.attrs!.image).toBeUndefined()
+    expect(wrapper.find('.resource-question-image').exists()).toBe(false)
+    editor.commands.undo(); await settle()
+    expect(api.getJSON().content![0]!.attrs!.image).toEqual(questionImage)
+  })
+
+  it('edits/removes the optional image, rejects unsafe addresses and recovers from load failure without changing JSON', async () => {
+    const { wrapper, editor, api } = await component({ modelValue: imageArticle() })
+    selectNode(editor, 0); await settle()
+    const input = wrapper.find('.resource-image-settings input[type="url"]')
+    await input.setValue('javascript:bad')
+    expect(api.getJSON().content![0]!.attrs!.image).toEqual(questionImage)
+    expect((input.element as HTMLInputElement).value).toBe(questionImage.src)
+    await wrapper.find('.resource-question-image').trigger('error')
+    expect(wrapper.find('.resource-image-error').text()).toContain('加载失败')
+    expect(api.getJSON().content![0]!.attrs!.image).toEqual(questionImage)
+    await input.setValue('/different.png')
+    expect(api.getJSON().content![0]!.attrs!.image).toEqual({ src: '/different.png' })
+    expect(wrapper.find('.resource-question-image').attributes('src')).toBe('/different.png')
+    await wrapper.find('.resource-image-remove').trigger('click')
+    expect(api.getJSON().content![0]!.attrs!.image).toBeUndefined()
+    expect(wrapper.find('.resource-question-image').exists()).toBe(false)
+    editor.commands.undo(); await settle()
+    expect(api.getJSON().content![0]!.attrs!.image).toEqual({ src: '/different.png' })
+  })
+
+  it('uploads only the question image, shares pending/save controls, preserves bindings/settings and supports undo/redo', async () => {
+    const pending = deferredImage()
+    const upload = vi.fn<ImageUploadHandler>().mockImplementation(() => pending.promise)
+    const { wrapper, editor, api } = await component({ modelValue: imageArticle(), uploadImage: upload })
+    bindQuestionOption(editor, 'q1', 'fast', paragraphTargets(editor.state.doc)[0]!.pos)
+    selectNode(editor, 0); await settle()
+    const before = api.getJSON()
+    await chooseQuestionImage(wrapper)
+    expect(upload).toHaveBeenCalledOnce()
+    expect(api.getJSON()).toEqual(before)
+    expect(wrapper.find('.image-upload-status').text()).toContain('1')
+    expect(wrapper.find('.top-actions .primary').attributes('disabled')).toBeDefined()
+    pending.resolve({ src: '/uploaded.png', width: 800, height: 300 })
+    await settle()
+    expect(api.getJSON().content![0]!.attrs).toEqual({ ...before.content![0]!.attrs, image: { src: '/uploaded.png', alt: 'cover.png', width: 800, height: 300 } })
+    expect(api.getJSON().content!.filter(node => node.type === 'image')).toHaveLength(0)
+    expect(wrapper.find('.image-upload-status').exists()).toBe(false)
+    const after = api.getJSON()
+    editor.commands.undo(); await settle()
+    expect(api.getJSON()).toEqual(before)
+    editor.commands.redo(); await settle()
+    expect(api.getJSON()).toEqual(after)
+    const readonly = await component({ modelValue: after, readonly: true, uploadImage: upload })
+    expect(readonly.api.getJSON()).toEqual(after)
+    expect(readonly.wrapper.find('.resource-question-image').attributes('src')).toBe('/uploaded.png')
+    selectNode(readonly.editor, 0); await settle()
+    expect(readonly.wrapper.find('.resource-image-settings input[type="file"]').attributes('disabled')).toBeDefined()
+    expect(readonly.wrapper.find('.resource-image-remove').attributes('disabled')).toBeDefined()
+  })
+
+  it('follows the original question through moves, selection changes and copies while uploading', async () => {
+    const pending = deferredImage()
+    const { wrapper, editor, api } = await component({ modelValue: article(), uploadImage: () => pending.promise })
+    selectNode(editor, 0); await settle()
+    await chooseQuestionImage(wrapper)
+    duplicateNode(editor, getSelectedNode(editor)!)
+    selectNode(editor, 0)
+    moveTopLevelNode(editor, getSelectedNode(editor)!, 1)
+    editor.commands.setTextSelection(paragraphTargets(editor.state.doc)[0]!.pos + 1)
+    pending.resolve('/moved.png'); await settle()
+    const questions = api.getJSON().content!.filter(node => node.type === 'resourceQuestion')
+    expect(questions.find(node => node.attrs!.id === 'q1')!.attrs!.image).toEqual({ src: '/moved.png', alt: 'cover.png' })
+    expect(questions.find(node => node.attrs!.id !== 'q1')!.attrs!.image).toBeUndefined()
+    expect(api.validate().valid).toBe(true)
+  })
+
+  it.each(['delete', 'document', 'readonly', 'unmount', 'resource', 'removeImage', 'editImage'] as const)('ignores a late image result after %s even when the host ignores abort', async action => {
+    const pending = deferredImage()
+    let signal!: AbortSignal
+    const { wrapper, editor, api, scope } = await component({ modelValue: imageArticle(), uploadImage: (_file, context) => { signal = context.signal; return pending.promise } })
+    selectNode(editor, 0); await settle()
+    await chooseQuestionImage(wrapper)
+    if (action === 'delete') editor.commands.deleteRange({ from: 0, to: 1 })
+    if (action === 'document') api.setContent({ type: 'doc', content: [question(), { type: 'paragraph' }] })
+    if (action === 'readonly') await wrapper.setProps({ readonly: true })
+    if (action === 'unmount') { wrapper.unmount(); wrappers.splice(wrappers.indexOf(wrapper), 1) }
+    if (action === 'resource') { await wrapper.find('.resource-choose').trigger('click'); scope().select(data) }
+    if (action === 'removeImage') await wrapper.find('.resource-image-remove').trigger('click')
+    if (action === 'editImage') await wrapper.find('.resource-image-settings input[type="url"]').setValue('/manual.png')
+    expect(signal.aborted).toBe(true)
+    const before = action !== 'unmount' ? api.getJSON() : null
+    pending.resolve('/late-upload.png'); await settle()
+    if (before) {
+      expect(api.getJSON()).toEqual(before)
+      expect(wrapper.find('.image-upload-status').exists()).toBe(false)
+    }
+  })
+
+  it('rejects invalid files and failed upload results without losing the original image', async () => {
+    const upload = vi.fn<ImageUploadHandler>().mockRejectedValueOnce(new Error('上传失败')).mockResolvedValueOnce('blob:temporary')
+    const { wrapper, editor, api } = await component({ modelValue: imageArticle(), uploadImage: upload, maxImageSize: 10 })
+    selectNode(editor, 0); await settle()
+    const before = api.getJSON()
+    await chooseQuestionImage(wrapper, [new File(['text'], 'text.txt', { type: 'text/plain' })])
+    await chooseQuestionImage(wrapper, [new File(['x'.repeat(11)], 'large.png', { type: 'image/png' })])
+    expect(upload).not.toHaveBeenCalled()
+    await chooseQuestionImage(wrapper)
+    await chooseQuestionImage(wrapper)
+    expect(upload).toHaveBeenCalledTimes(2)
+    expect(api.getJSON()).toEqual(before)
+    expect(wrapper.emitted('error')).toHaveLength(4)
+    expect(wrapper.find('.image-upload-status').exists()).toBe(false)
   })
 })

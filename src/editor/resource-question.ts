@@ -2,11 +2,30 @@ import type { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { closeHistory } from '@tiptap/pm/history'
 import type { ProseMirrorJSON } from './types'
+import type { ImageUploadResult } from './public-types'
+import imageSchema from '../protocol/resource-question-image-v1.schema.json'
+import Ajv from 'ajv'
+
+export type ResourceQuestionImage = ImageUploadResult
+const checkImage = new Ajv({ strict: false }).compile(imageSchema)
+
+/** Keep only persistent protocol fields; never retain the host's object reference. */
+export function snapshotQuestionImage(value: ResourceQuestionImage): ResourceQuestionImage {
+  if (!value || typeof value !== 'object') throw new Error('问题图片需包含有效的图片地址 src')
+  const image: ResourceQuestionImage = { src: value.src }
+  for (const key of ['alt', 'title', 'width', 'height'] as const) {
+    if (value[key] !== undefined) Object.assign(image, { [key]: value[key] })
+  }
+  if (!checkImage(image)) throw new Error('问题图片地址或尺寸无效，请使用持久的 HTTP(S) / 相对图片地址')
+  return image
+}
 
 export interface ResourceQuestionData {
   resourceId: string
   title: string
   description: string
+  /** Optional snapshot above the title. Omit/null to select a resource without an image. */
+  image?: ResourceQuestionImage | null
   options: { id: string; label: string }[]
 }
 export interface ResourceQuestionOption {
@@ -57,7 +76,8 @@ export function snapshotResourceQuestion(value: ResourceQuestionData): ResourceQ
     ids.add(option.id)
     return { id: option.id, label: option.label }
   })
-  return { resourceId: value.resourceId, title: value.title, description: value.description, options }
+  const image = value.image == null ? undefined : snapshotQuestionImage(value.image)
+  return { resourceId: value.resourceId, title: value.title, description: value.description, options, ...(image && { image }) }
 }
 
 export function findQuestion(doc: PMNode, id: string) {
