@@ -74,19 +74,19 @@ npm run test:package    # tgz 在独立 Vue 项目安装、类型检查和构建
 发布后安装：
 
 ```bash
-npm install article-block-editor
+npm install @nova_voyager/article-block-editor
 ```
 
-尚未发布时，在本仓库执行 `npm pack`（自动构建），然后在业务项目执行 `npm install /path/to/article-block-editor-1.0.0.tgz`。无需复制源码或配置 `@/` 别名。
+尚未发布时，在本仓库执行 `npm pack`（自动构建），然后在业务项目中用 `npm install` 安装命令输出的 `.tgz` 文件路径。无需复制源码或配置 `@/` 别名。
 
 宿主需要 Vue 3.5+（<4）。包为 ESM，面向 Vite 等支持 ESM 的 Vue 3 工程，不提供 Vue 2、React 或直接 `require()` 接口。必须引入样式：
 
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ArticleEditor, createEmptyDocument } from 'article-block-editor'
-import type { ArticleEditorExpose, ArticleEditorError, ProseMirrorJSON } from 'article-block-editor'
-import 'article-block-editor/style.css'
+import { ArticleEditor, createEmptyDocument } from '@nova_voyager/article-block-editor'
+import type { ArticleEditorExpose, ArticleEditorError, ProseMirrorJSON } from '@nova_voyager/article-block-editor'
+import '@nova_voyager/article-block-editor/style.css'
 
 const content = ref<ProseMirrorJSON>(createEmptyDocument())
 const editorRef = ref<ArticleEditorExpose | null>(null)
@@ -112,7 +112,7 @@ function onError(error: ArticleEditorError) {
 </template>
 ```
 
-也支持默认导入 `import ArticleEditor from 'article-block-editor'`。多个实例分别绑定各自的 JSON，不共享文档或存储键。
+也支持默认导入 `import ArticleEditor from '@nova_voyager/article-block-editor'`。多个实例分别绑定各自的 JSON，不共享文档或存储键。
 
 ## 组件接口
 
@@ -164,9 +164,9 @@ SSR 工程可以导入本包，但编辑视图在客户端挂载后创建；服�
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ArticleEditor, createEmptyDocument } from 'article-block-editor'
-import type { ImageUploadHandler } from 'article-block-editor'
-import 'article-block-editor/style.css'
+import { ArticleEditor, createEmptyDocument } from '@nova_voyager/article-block-editor'
+import type { ImageUploadHandler } from '@nova_voyager/article-block-editor'
+import '@nova_voyager/article-block-editor/style.css'
 
 const content = ref(createEmptyDocument())
 const uploadImage: ImageUploadHandler = async (file, { signal }) => {
@@ -247,14 +247,14 @@ Vue 是 peer dependency，不打进包；Tiptap/ProseMirror 等运行时依赖�
 旧 v1 文档无需迁移。含新样式的文档需要下游同时支持相应扩展；原 v1 校验器不接受两个颜色 mark、`paragraph.attrs.fontSize` 或 `image.attrs.imageLayout`。包公开：
 
 ```ts
-import { toProtocolJSON, validateProtocolDocument, validateProtocolV1Document } from 'article-block-editor'
+import { toProtocolJSON, validateProtocolDocument, validateProtocolV1Document } from '@nova_voyager/article-block-editor'
 ```
 
 `validateProtocolDocument` 支持 v1 + 颜色 / 正文字号 / 图片排版扩展；`validateProtocolV1Document` 仅检查原始 v1。`toProtocolJSON` 用于规范化编辑器输出，不代替输入校验。
 
 ## npm 发布
 
-发布前将 package.json 的 name 改为你有权限的包名（可用 `@你的组织/article-editor`），设置版本并确认许可证。当前使用 UNLICENSED，不擅自授予开源许可；如需开源，由维护者选择许可证并补充 LICENSE 文件。
+本包以 `@nova_voyager/article-block-editor` 公开发布到 npm，许可证为 MIT。首次发布时使用有该包发布权限的账号。
 
 ```bash
 npm test
@@ -264,7 +264,47 @@ npm login
 npm publish --access public
 ```
 
-prepack 自动重新构建，prepublishOnly 自动运行测试和独立安装验证。只有 dist/、README 和 package.json 等 npm 必需文件进入发布包，演示页和测试代码不发布。仓库改造不等于已经发布，不会自动登录或发布 npm。
+`npm publish` 会触发 `prepublishOnly`，运行组件测试和独立项目安装验证。`prepack` 会重新构建组件库及类型声明。发布包包含 `dist/`、`docs/`、README、LICENSE 和包清单。
+
+## npm 更新流程
+
+### 维护者发布新版本
+
+在编辑器仓库根目录提交本次改动，确认 Git 工作区干净。安装锁定的依赖，再核对本地版本和 npm 上的 `latest` 版本。
+
+```bash
+npm ci
+npm pkg get version
+npm view @nova_voyager/article-block-editor@latest version --registry=https://registry.npmjs.org
+npm whoami --registry=https://registry.npmjs.org
+```
+
+使用有发布权限的 npm 账号。若 `npm whoami` 提示未登录，先运行 `npm login --registry=https://registry.npmjs.org`。
+
+按改动选择一个尚未发布的版本号。修复问题用 `patch`，新增兼容功能用 `minor`，不兼容变更用 `major`。下面以新增卡片功能为例，`npm version minor` 会更新 `package.json` 和 `package-lock.json`，并默认创建版本提交和 Git 标签。[npm version 文档](https://docs.npmjs.com/cli/v11/commands/npm-version/)
+
+```bash
+npm version minor
+npm publish --access public
+```
+
+发布成功后，核对 `latest` 与刚生成的版本号一致，再将版本提交和标签推送到远端。
+
+```bash
+npm view @nova_voyager/article-block-editor@latest version --registry=https://registry.npmjs.org
+git push --follow-tags
+```
+
+### 业务项目升级依赖
+
+在使用编辑器的项目根目录执行下列命令。`npm ls` 显示该项目实际安装的版本。
+
+```bash
+npm install @nova_voyager/article-block-editor@latest
+npm ls @nova_voyager/article-block-editor --depth=0
+```
+
+运行该项目的测试和构建，再提交更新后的依赖清单和锁文件。如果项目需要固定版本，将 `@latest` 替换为已发布的具体版本号，并添加 `--save-exact`。[npm install 文档](https://docs.npmjs.com/cli/v11/commands/npm-install/)
 
 ## 目录
 
