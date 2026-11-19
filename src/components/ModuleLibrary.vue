@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {
+  AppWindow,
   Braces,
+  Gamepad2,
   ChevronDown,
   CircleHelp,
   Image,
@@ -25,6 +27,8 @@ const groups = computed(() => groupDefinitions.map(group => ({
 })).filter(group => group.modules.length > 0))
 
 const icons: Record<string, Component> = {
+  app: AppWindow,
+  game: Gamepad2,
   image: Image,
   button: MousePointerClick,
   quote: Quote,

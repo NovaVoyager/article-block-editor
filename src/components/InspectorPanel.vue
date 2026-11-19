@@ -13,6 +13,7 @@ import {
 } from '@lucide/vue'
 import type { SelectedNode } from '../editor/types'
 import type { TableCommand, TableContext } from '../editor/table'
+import { firstBanner, kindLabels, type AppGameCardAttrs } from '../editor/app-game-card'
 import { normalizeFontSize } from '../editor/font-size'
 import { normalizeImageLayout } from '../editor/image-layout'
 import ImageFilePicker from './ImageFilePicker.vue'
@@ -63,6 +64,7 @@ const names: Record<string, string> = {
 
 const type = computed(() => props.selected?.node.type.name ?? '')
 const attrs = computed<Record<string, unknown>>(() => props.selected?.node.attrs ?? {})
+const card = computed(() => attrs.value as unknown as AppGameCardAttrs)
 const presetFontSizes = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96]
 const fontSizeOptions = computed(() => {
   const current = normalizeFontSize(attrs.value.fontSize)
@@ -135,7 +137,7 @@ function setButtonStyle(event: Event) {
       <div class="selected-summary">
         <div>
           <small>当前模块</small>
-          <strong>{{ names[type] || type }}</strong>
+          <strong>{{ type === 'appGameCard' ? kindLabels[card.kind] + '卡片' : names[type] || type }}</strong>
         </div>
         <code>{{ type }}</code>
       </div>
@@ -262,6 +264,19 @@ function setButtonStyle(event: Event) {
           <span>说明标题</span>
           <input :value="attrs.title" type="text" placeholder="可选" @change="optionalTextPatch('title', $event)" />
         </label>
+      </section>
+
+      <section v-if="type === 'appGameCard'" class="property-section">
+        <h3>横向展示图</h3>
+        <ImageFilePicker label="上传展示图" :disabled="readonly || !canUpload || uploading" @files="emit('uploadImage', $event)" />
+        <p v-if="!canUpload && !readonly" class="image-upload-help">宿主配置 uploadImage 后可上传展示图。</p>
+        <label class="field-label">
+          <span>自定义图片地址</span>
+          <input :value="card.displayImage ?? ''" type="url" :disabled="readonly"
+            :placeholder="firstBanner(card.item?.banner) || 'https://…'"
+            @change="emit('patch', { displayImage: ($event.target as HTMLInputElement).value.trim() || null })" />
+        </label>
+        <p class="image-upload-help">留空时使用所选{{ kindLabels[card.kind] }}的第一张 banner 图。</p>
       </section>
 
       <ResourceQuestionSettings v-if="type === 'resourceQuestion'" :question="attrs as unknown as ResourceQuestionAttrs" :targets="paragraphTargets ?? []" :readonly="readonly"

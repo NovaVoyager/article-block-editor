@@ -5,6 +5,7 @@ import { ArticleEditor, createEmptyDocument, validateProtocolDocument } from './
 import type { ArticleEditorError, ArticleEditorExpose, ProseMirrorJSON } from './index'
 import { initialDocument } from './editor/modules'
 import { demoImageUpload } from './demo-image-upload'
+import DemoAppGamePicker from './components/DemoAppGamePicker.vue'
 import DemoResourcePicker from './components/DemoResourcePicker.vue'
 import { resourceQuestionDemo } from './demo-resource-question'
 import './playground.css'
@@ -148,6 +149,7 @@ function renderJson() {
       @save="save"
       @error="handleError"
     >
+      <template #app-game-picker="scope"><DemoAppGamePicker v-bind="scope" /></template>
       <template #resource-question-picker="{ current, select, cancel }">
         <DemoResourcePicker :current="current" @confirm="select" @cancel="cancel" />
       </template>
@@ -155,6 +157,7 @@ function renderJson() {
     <section v-if="showSecond" class="playground-second">
       <h2>独立实例（数据互不影响）</h2>
       <ArticleEditor v-model="secondContent" :height="600" :show-inspector="false" :upload-image="demoImageUpload" :max-image-size="2 * 1024 * 1024">
+        <template #app-game-picker="scope"><DemoAppGamePicker v-bind="scope" /></template>
         <template #resource-question-picker="{ current, select, cancel }"><DemoResourcePicker :current="current" @confirm="select" @cancel="cancel" /></template>
       </ArticleEditor>
     </section>

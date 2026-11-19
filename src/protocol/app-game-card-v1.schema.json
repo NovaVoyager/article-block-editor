@@ -1,0 +1,33 @@
+{
+  "$id": "urn:article-content-protocol:app-game-card:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "attrs"],
+  "properties": {
+    "type": { "const": "appGameCard" },
+    "attrs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["app", "game"] },
+        "item": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "name"],
+          "properties": {
+            "id": { "anyOf": [{ "type": "string", "pattern": "\\S" }, { "type": "integer" }] },
+            "name": { "type": "string", "pattern": "\\S" },
+            "icon": { "type": "string" },
+            "category": { "type": "string" },
+            "rating": { "type": ["number", "string"] },
+            "version": { "type": "string" },
+            "developer": { "type": "string" },
+            "banner": { "type": "string" }
+          }
+        },
+        "displayImage": { "type": "string", "pattern": "\\S", "description": "Optional replacement for the first nonempty URL in item.banner (comma-separated)." }
+      }
+    }
+  }
+}

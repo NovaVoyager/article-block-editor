@@ -9,7 +9,7 @@ export const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image
 export const IMAGE_ACCEPT = IMAGE_MIME_TYPES.join(',')
 export const DEFAULT_MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
-type Target = { kind: 'insert' | 'replace'; pos: number } | { kind: 'resourceQuestion'; questionId: string }
+type Target = { kind: 'insert' | 'replace' | 'appGameCard'; pos: number } | { kind: 'resourceQuestion'; questionId: string }
 type Job = Target & { file: File; controller: AbortController; imageBefore?: string }
 
 export function imageFileError(file: File, maximum: number): string | null {
@@ -78,6 +78,11 @@ export function createImageUploadManager(editor: Editor, options: {
         continue
       }
       const mapped = transaction.mapping.mapResult(job.pos, 1)
+      if (job.kind === 'appGameCard' && transaction.doc.nodeAt(mapped.pos) !== transaction.before.nodeAt(job.pos)) {
+        // A new catalog selection or manual URL takes precedence over an outstanding upload.
+        cancel(job)
+        continue
+      }
       if (mapped.deleted || (job.kind === 'replace' && transaction.doc.nodeAt(mapped.pos)?.type.name !== 'image')) {
         cancel(job)
         options.onError('上传目标已被删除或修改，请重新上传', job.file)
@@ -105,6 +110,15 @@ export function createImageUploadManager(editor: Editor, options: {
         if (!question) { options.onError('资源问题已不存在，请重新选择', file); continue }
         cancelQuestion(target.questionId)
       }
+      if (target.kind === 'appGameCard') {
+        if (editor.state.doc.nodeAt(target.pos)?.type.name !== 'appGameCard') {
+          options.onError('卡片已不存在，请重新选择', file)
+          continue
+        }
+        for (const previous of jobs) {
+          if (previous.kind === 'appGameCard' && previous.pos === target.pos) cancel(previous)
+        }
+      }
       const job: Job = { ...target, file, controller: new AbortController(),
         ...(question && { imageBefore: JSON.stringify(question.node.attrs.image ?? null) }),
       }
@@ -128,7 +142,10 @@ export function createImageUploadManager(editor: Editor, options: {
         // Remove this job before dispatch so its own node replacement cannot cancel itself.
         jobs.delete(job)
         const transaction = closeHistory(editor.state.tr)
-        if (job.kind === 'resourceQuestion' && node && image) {
+        if (job.kind === 'appGameCard') {
+          if (node?.type.name !== 'appGameCard') throw new Error('卡片已不存在，请重新上传')
+          transaction.setNodeMarkup(pos, undefined, { ...node.attrs, displayImage: attrs.src })
+        } else if (job.kind === 'resourceQuestion' && node && image) {
           transaction.setNodeMarkup(pos, undefined, { ...node.attrs, image })
         } else if (job.kind === 'replace' && node) {
           transaction.setNodeMarkup(pos, undefined, {

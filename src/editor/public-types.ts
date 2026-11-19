@@ -31,7 +31,7 @@ export interface ArticleEditorProps {
 }
 
 export interface ArticleEditorError {
-  source: 'modelValue' | 'setContent' | 'json' | 'save' | 'upload' | 'protocol' | 'resourceQuestion'
+  source: 'modelValue' | 'setContent' | 'json' | 'save' | 'upload' | 'protocol' | 'resourceQuestion' | 'appGameCard'
   message: string
   errors: string[]
   fileName?: string

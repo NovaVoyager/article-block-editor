@@ -5,6 +5,8 @@ import imageLayoutSchema from './image-layout-v1.schema.json'
 import resourceQuestionSchema from './resource-question-v1.schema.json'
 import resourceQuestionImageSchema from './resource-question-image-v1.schema.json'
 
+import appGameCardSchema from './app-game-card-v1.schema.json'
+
 const anchorSchema = { type: 'string', minLength: 1, pattern: '\\S', description: 'Stable paragraph/heading anchor, unique within the article. New resource option bindings use the external option ID; existing anchors remain valid.' }
 const anchorAttribute = { name: 'anchorId', type: 'string', required: false, description: anchorSchema.description }
 
@@ -23,6 +25,8 @@ export const currentDocumentSchema = {
   },
   definitions: {
     ...baseDocumentSchema.definitions,
+    blockNode: { oneOf: [...baseDocumentSchema.definitions.blockNode.oneOf, { $ref: '#/definitions/appGameCard' }] },
+    appGameCard: appGameCardSchema,
     resourceQuestion: resourceQuestionSchema,
     resourceQuestionImage: resourceQuestionImageSchema,
     heading: {
@@ -79,6 +83,7 @@ const currentProtocol = {
     { id: 'image-layout', version: 1, schemaId: imageLayoutSchema.$id },
     { id: 'resource-question', version: 1, schemaId: resourceQuestionSchema.$id },
     { id: 'paragraph-anchor', version: 1 },
+    { id: 'app-game-card', version: 1, schemaId: appGameCardSchema.$id },
   ],
   nodes: [...protocolDefinition.nodes.map(node => {
     if (node.type === 'heading') return {
@@ -124,6 +129,14 @@ const currentProtocol = {
       description: `See documentSchema.definitions.resourceQuestion.properties.attrs.properties.${name}`,
     })),
     render: { mode: 'component', element: 'resource-question' },
+  }, {
+    type: 'appGameCard', description: 'App or game catalog snapshot. Render using the saved item.',
+    attributes: [
+      { name: 'kind', type: 'string', required: true, allowedValues: ['app', 'game'] },
+      { name: 'item', type: 'object', required: false, description: 'Selected catalog item. Omitted until a selection is made.' },
+      { name: 'displayImage', type: 'string', required: false, description: appGameCardSchema.properties.attrs.properties.displayImage.description },
+    ],
+    render: { mode: 'component', element: 'app-game-card' },
   }],
   resourceQuestionRules: {
     data: 'Save the selected resourceId, title, description and options as a snapshot. Option IDs are stable strings supplied by the resource. Do not fetch on render.',

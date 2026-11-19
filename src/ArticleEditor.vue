@@ -10,7 +10,8 @@ import JsonPanel from './components/JsonPanel.vue'
 import LinkDialog from './components/LinkDialog.vue'
 import ModuleLibrary from './components/ModuleLibrary.vue'
 import ImageFilePicker from './components/ImageFilePicker.vue'
-import ResourceQuestionPicker from './components/ResourceQuestionPicker.vue'
+import PickerDialog from './components/PickerDialog.vue'
+import { kindLabels, snapshotAppGame, type AppGameCardAttrs, type AppGamePickerScope } from './editor/app-game-card'
 import { anchorHighlightKey } from './editor/anchors'
 import { closeHistory } from '@tiptap/pm/history'
 import { bindQuestionOption, findQuestion, paragraphTargets, snapshotResourceQuestion, type ParagraphTarget, type ResourceQuestionAttrs, type ResourceQuestionPickerScope } from './editor/resource-question'
@@ -49,11 +50,16 @@ const emit = defineEmits<{
   validation: [result: ValidationResult]
   error: [error: ArticleEditorError]
 }>()
-defineSlots<{ 'resource-question-picker'(scope: ResourceQuestionPickerScope): unknown }>()
+defineSlots<{
+  'resource-question-picker'(scope: ResourceQuestionPickerScope): unknown
+  'app-game-picker'(scope: AppGamePickerScope): unknown
+}>()
 
 const rootElement = ref<HTMLElement>()
 const targets = shallowRef<ParagraphTarget[]>([])
 const pickerSession = shallowRef<ResourceQuestionPickerScope | null>(null)
+const appGamePicker = shallowRef<AppGamePickerScope | null>(null)
+let appGameTargetExists: (() => boolean) | undefined
 const pickerError = ref('')
 let highlightTimer: number | undefined
 const selected = shallowRef<SelectedNode | null>(null)
@@ -76,7 +82,7 @@ let toastTimer: number | undefined
 let applyingExternal = false
 
 const editor = useEditor({
-  extensions: createProtocolExtensions({ onChoose: openResourcePicker, onNavigate: navigateAnchor }),
+  extensions: createProtocolExtensions({ onChoose: openResourcePicker, onNavigate: navigateAnchor }, openAppGamePicker),
   content: createEmptyDocument(),
   editable: !isReadonly.value,
   injectCSS: false,
@@ -120,7 +126,7 @@ const currentLinkAttrs = computed(() => editor.value?.getAttributes('link') ?? {
 watch(isReadonly, (value) => {
   editor.value?.setEditable(!value, false)
   if (value) {
-    closeResourcePicker()
+    closePickers()
     linkOpen.value = false
     fileDragActive.value = false
     imageUploads?.cancelAll()
@@ -131,7 +137,7 @@ watch(() => props.modelValue, (value) => {
 }, { deep: true })
 
 onBeforeUnmount(() => {
-  closeResourcePicker()
+  closePickers()
   imageUploads?.destroy()
   if (toastTimer) window.clearTimeout(toastTimer)
   if (highlightTimer) window.clearTimeout(highlightTimer)
@@ -152,7 +158,7 @@ function replaceContent(value: ProseMirrorJSON, source: ArticleEditorError['sour
   if (!currentEditor || currentEditor.isDestroyed) return false
   applyingExternal = true
   try {
-    const changed = replaceEditorDocument(currentEditor, value, () => { imageUploads?.cancelAll(); closeResourcePicker() })
+    const changed = replaceEditorDocument(currentEditor, value, () => { imageUploads?.cancelAll(); closePickers() })
     refreshEditorState(currentEditor)
     if (changed && notify) emitDocument(currentEditor)
     return true
@@ -168,6 +174,7 @@ function refreshSelection(currentEditor: CoreEditor) {
   selected.value = getSelectedNode(currentEditor)
   selectedTable.value = getTableContext(currentEditor)
   targets.value = paragraphTargets(currentEditor.state.doc)
+  if (appGameTargetExists && !appGameTargetExists()) closePickers()
   if (pickerSession.value && !findQuestion(currentEditor.state.doc, pickerSession.value.current.id)) closeResourcePicker()
 }
 
@@ -228,8 +235,12 @@ function insertUploadedImages(files: File[]) {
 }
 
 function replaceSelectedImage(files: File[]) {
-  if (!selected.value || selected.value.node.type.name !== 'image' || isReadonly.value) return
-  void uploadManager()?.upload(files, { kind: 'replace', pos: selected.value.pos })
+  const target = selected.value
+  if (!target || isReadonly.value) return
+  const type = target.node.type.name
+  if (type === 'image' || type === 'appGameCard') {
+    void uploadManager()?.upload(files, { kind: type === 'image' ? 'replace' : 'appGameCard', pos: target.pos })
+  }
 }
 
 function uploadQuestionImage(files: File[]) {
@@ -311,6 +322,49 @@ function patchSelectedNode(attributes: Record<string, unknown>) {
   updateNodeAttrs(editor.value, selected.value, attributes)
 }
 
+function closePickers() {
+  appGamePicker.value = null
+  appGameTargetExists = undefined
+  closeResourcePicker()
+}
+
+function openAppGamePicker(getPos: () => number | undefined) {
+  const currentEditor = editor.value
+  const pos = getPos()
+  if (!currentEditor || isReadonly.value || pos == null) return
+  const target = currentEditor.state.doc.nodeAt(pos)
+  if (target?.type.name !== 'appGameCard') return
+  closePickers()
+  const attrs = target.attrs as AppGameCardAttrs
+  appGameTargetExists = () => {
+    const at = getPos()
+    return at != null && at < currentEditor.state.doc.content.size && currentEditor.state.doc.nodeAt(at) === target
+  }
+  const session: AppGamePickerScope = {
+    kind: attrs.kind,
+    current: attrs.item ? { ...attrs.item } : null,
+    cancel: () => { if (appGamePicker.value === session) closePickers() },
+    select: data => {
+      if (appGamePicker.value !== session || isReadonly.value || currentEditor.isDestroyed) return false
+      const at = getPos()
+      if (at == null || at >= currentEditor.state.doc.content.size || currentEditor.state.doc.nodeAt(at) !== target) return false
+      try {
+        const item = snapshotAppGame(data)
+        const displayImage = !attrs.item || attrs.item.id === item.id ? attrs.displayImage : null
+        closePickers()
+        currentEditor.view.dispatch(closeHistory(currentEditor.state.tr).setNodeMarkup(at, undefined, { kind: attrs.kind, item, displayImage }))
+        return true
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        pickerError.value = message
+        emit('error', { source: 'appGameCard', message, errors: [message] })
+        return false
+      }
+    },
+  }
+  appGamePicker.value = session
+}
+
 function closeResourcePicker() {
   pickerSession.value = null
   pickerError.value = ''
@@ -322,6 +376,7 @@ function openResourcePicker(id?: string) {
   const questionId = id ?? (selected.value?.node.type.name === 'resourceQuestion' ? selected.value.node.attrs.id : null)
   const question = questionId ? findQuestion(currentEditor.state.doc, questionId) : undefined
   if (!question) return
+  closePickers()
   const session: ResourceQuestionPickerScope = {
     current: JSON.parse(JSON.stringify(question.node.attrs)) as ResourceQuestionAttrs,
     cancel: () => { if (pickerSession.value === session) closeResourcePicker() },
@@ -630,9 +685,12 @@ defineExpose(api)
       @remove="removeLink"
     />
 
-    <ResourceQuestionPicker v-if="pickerSession" :session="pickerSession" :error="pickerError">
-      <template v-if="$slots['resource-question-picker']" #default="scope"><slot name="resource-question-picker" v-bind="scope" /></template>
-    </ResourceQuestionPicker>
+    <PickerDialog v-if="pickerSession" title="选择资源问题" description="选中后保存完整快照；更换其他资源会清除旧段落绑定。" :error="pickerError" @close="pickerSession.cancel()">
+      <slot name="resource-question-picker" v-bind="pickerSession"><p>宿主尚未配置资源选择组件。请通过 resource-question-picker 插槽接入。</p></slot>
+    </PickerDialog>
+    <PickerDialog v-if="appGamePicker" :title="'选择' + kindLabels[appGamePicker.kind]" :error="pickerError" @close="appGamePicker.cancel()">
+      <slot name="app-game-picker" v-bind="appGamePicker"><p>请通过 app-game-picker 插槽接入{{ kindLabels[appGamePicker.kind] }}选择器。</p></slot>
+    </PickerDialog>
 
     <Transition name="toast">
       <div v-if="toast" class="toast-message" :class="toast.tone">

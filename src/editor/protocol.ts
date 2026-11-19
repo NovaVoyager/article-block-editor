@@ -6,6 +6,8 @@ import { normalizeImageLayout } from './image-layout'
 import type { ProseMirrorJSON, ValidationResult } from './types'
 import { resourceIdentityErrors, type ResourceQuestionOption } from './resource-question'
 
+import { appGameAttrs, type AppGameCardAttrs } from './app-game-card'
+
 const ajv = new Ajv({ allErrors: true, strict: false })
 const validateV1 = ajv.compile(baseDocumentSchema)
 const validate = ajv.compile(currentDocumentSchema)
@@ -82,6 +84,8 @@ function sanitizeNode(node: ProseMirrorJSON): ProseMirrorJSON {
       return { type: 'image', attrs: sanitizeImageAttrs(node.attrs) }
     case 'articleButton':
       return { type: 'articleButton', attrs: sanitizeButtonAttrs(node.attrs) }
+    case 'appGameCard':
+      return { type: 'appGameCard', attrs: appGameAttrs(node.attrs as unknown as AppGameCardAttrs) }
     case 'resourceQuestion': {
       const attrs = node.attrs ?? {}
       return { type: 'resourceQuestion', attrs: {
