@@ -13,7 +13,7 @@ import { normalizeImageLayout } from './image-layout'
 import { ParagraphAnchors } from './anchors'
 import { ProtocolResourceQuestion, type ResourceQuestionHandlers } from './resource-question-extension'
 
-import { ProtocolAppGameCard } from './app-game-card-extension'
+import { ProtocolAppGameCard, type AppGameCardOptions } from './app-game-card-extension'
 
 const ProtocolDocument = Node.create({
   name: 'doc',
@@ -163,7 +163,7 @@ const ProtocolTable = Table.extend({ content: 'tableRow+' }).configure({
 const ProtocolTableRow = TableRow.extend({ content: 'tableCell+' })
 const ProtocolTableCell = TableCell.extend({ content: 'block+' })
 
-export function createProtocolExtensions(resourceQuestionHandlers: ResourceQuestionHandlers = {}, onChooseAppGame?: (getPos: () => number | undefined) => void) {
+export function createProtocolExtensions(resourceQuestionHandlers: ResourceQuestionHandlers = {}, appGameOptions: AppGameCardOptions = {}) {
   return [
     StarterKit.configure({
       document: false,
@@ -176,7 +176,7 @@ export function createProtocolExtensions(resourceQuestionHandlers: ResourceQuest
     ProtocolCodeBlock,
     ProtocolImage,
     ProtocolArticleButton,
-    ProtocolAppGameCard.configure({ onChoose: onChooseAppGame }),
+    ProtocolAppGameCard.configure(appGameOptions),
     ProtocolResourceQuestion.configure(resourceQuestionHandlers),
     ParagraphAnchors,
     ProtocolLink,

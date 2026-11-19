@@ -136,7 +136,10 @@ const currentProtocol = {
       { name: 'item', type: 'object', required: false, description: 'Selected catalog item. Omitted until a selection is made.' },
       { name: 'displayImage', type: 'string', required: false, description: appGameCardSchema.properties.attrs.properties.displayImage.description },
     ],
-    render: { mode: 'component', element: 'app-game-card' },
+    render: {
+      mode: 'component', element: 'app-game-card',
+      action: 'Below the item details, render a link when the host resolves a URL from attrs.item and attrs.kind. Resolve at render time. An absent item or URL omits the link.',
+    },
   }],
   resourceQuestionRules: {
     data: 'Save the selected resourceId, title, description and options as a snapshot. Option IDs are stable strings supplied by the resource. Do not fetch on render.',

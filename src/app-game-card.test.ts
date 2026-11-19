@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { h, nextTick } from 'vue'
+import { h, nextTick, ref } from 'vue'
 import { getSchema, type Editor } from '@tiptap/core'
 import { DOMParser, DOMSerializer } from '@tiptap/pm/model'
 import ArticleEditor from './ArticleEditor.vue'
-import type { AppGameData, AppGameKind, AppGamePickerScope, ArticleEditorExpose, ImageUploadHandler } from './index'
+import type { AppGameCardClick, AppGameData, AppGameKind, AppGamePickerScope, ArticleEditorExpose, ImageUploadHandler } from './index'
 import { createProtocolExtensions } from './editor/extensions'
 import { toProtocolJSON, validateProtocolDocument, validateProtocolV1Document } from './editor/protocol'
 
@@ -148,6 +148,63 @@ describe('app and game cards', () => {
     api.clear()
     expect(stale.select(item)).toBe(false)
     expect(api.getJSON().content?.some(n => n.type === 'appGameCard')).toBe(false)
+  })
+
+  it.each(['app', 'game'] as const)('resolves the %s detail link in preview and lets the host handle navigation', async kind => {
+    const { wrapper, scope, api } = await setup(kind)
+    scope().select(item)
+    const locale = ref('zh')
+    const resolveAppGameLink = vi.fn((data: AppGameData, type: AppGameKind) => `/${locale.value}/${type}/${data.id}`)
+    const onClick = vi.fn(({ event }: AppGameCardClick) => event.preventDefault())
+    await wrapper.setProps({ resolveAppGameLink, onAppGameClick: onClick })
+    const before = api.getJSON()
+    const changes = wrapper.emitted('change')?.length
+    const preview = wrapper.findAll('.top-actions button').find(button => button.text() === '预览')!
+    expect(wrapper.find('.app-game-link').exists()).toBe(false)
+    await preview.trigger('click')
+    const link = wrapper.get('.app-game-info a.app-game-link')
+    expect(wrapper.find('.app-game-choose').exists()).toBe(false)
+    expect(resolveAppGameLink).toHaveBeenCalledWith(item, kind)
+    expect(link.text()).toBe(kind === 'app' ? '查看应用' : '查看游戏')
+    expect(link.attributes('href')).toBe(`/zh/${kind}/0`)
+    locale.value = 'en'
+    await nextTick()
+    const href = `/en/${kind}/0`
+    expect(link.attributes('href')).toBe(href)
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+    link.element.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+    expect(onClick).toHaveBeenCalledOnce()
+    expect(onClick).toHaveBeenCalledWith({ event, kind, item, href })
+    expect(api.getJSON()).toEqual(before)
+    expect(wrapper.emitted('change')?.length).toBe(changes)
+    await preview.trigger('click')
+    expect(wrapper.get('.app-game-choose').text()).toBe(kind === 'app' ? '更换应用' : '更换游戏')
+    expect(wrapper.find('.app-game-link').exists()).toBe(false)
+  })
+
+  it('refreshes a read-only link when its resolver or item changes and omits unavailable links', async () => {
+    const { wrapper, scope, api, editor } = await setup('app')
+    scope().select(item)
+    await wrapper.setProps({ readonly: true })
+    expect(wrapper.find('.app-game-link').exists()).toBe(false)
+    const resolveAppGameLink = vi.fn((data: AppGameData) => 'catalog://details/' + data.id)
+    await wrapper.setProps({ resolveAppGameLink })
+    expect(wrapper.get('.app-game-link').attributes('href')).toBe('catalog://details/0')
+    expect(editor.getHTML()).toContain('href="catalog://details/0"')
+    api.setContent({ type: 'doc', content: [{ type: 'appGameCard', attrs: { kind: 'app', item: { ...item, id: 2 } } }] })
+    await nextTick()
+    expect(wrapper.get('.app-game-link').attributes('href')).toBe('catalog://details/2')
+    for (const result of [null, ' ', 'javascript:void(0)']) {
+      await wrapper.setProps({ resolveAppGameLink: () => result })
+      expect(wrapper.find('.app-game-link').exists()).toBe(false)
+      expect(editor.getHTML()).not.toContain('class="app-game-link"')
+    }
+    api.setContent({ type: 'doc', content: [{ type: 'appGameCard', attrs: { kind: 'app' } }] })
+    resolveAppGameLink.mockClear()
+    await wrapper.setProps({ resolveAppGameLink })
+    expect(resolveAppGameLink).not.toHaveBeenCalled()
+    expect(wrapper.find('.app-game-link').exists()).toBe(false)
   })
 
   it('round-trips HTML and JSON with the extended protocol', () => {

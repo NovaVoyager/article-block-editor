@@ -11,7 +11,7 @@ import LinkDialog from './components/LinkDialog.vue'
 import ModuleLibrary from './components/ModuleLibrary.vue'
 import ImageFilePicker from './components/ImageFilePicker.vue'
 import PickerDialog from './components/PickerDialog.vue'
-import { kindLabels, snapshotAppGame, type AppGameCardAttrs, type AppGamePickerScope } from './editor/app-game-card'
+import { kindLabels, snapshotAppGame, type AppGameCardAttrs, type AppGameCardClick, type AppGamePickerScope } from './editor/app-game-card'
 import { anchorHighlightKey } from './editor/anchors'
 import { closeHistory } from '@tiptap/pm/history'
 import { bindQuestionOption, findQuestion, paragraphTargets, snapshotResourceQuestion, type ParagraphTarget, type ResourceQuestionAttrs, type ResourceQuestionPickerScope } from './editor/resource-question'
@@ -43,6 +43,7 @@ const props = withDefaults(defineProps<ArticleEditorProps>(), {
   maxImageSize: DEFAULT_MAX_IMAGE_SIZE,
 })
 const emit = defineEmits<{
+  appGameClick: [click: AppGameCardClick]
   'update:modelValue': [document: ProseMirrorJSON]
   change: [document: ProseMirrorJSON]
   save: [document: ProseMirrorJSON]
@@ -82,7 +83,18 @@ let toastTimer: number | undefined
 let applyingExternal = false
 
 const editor = useEditor({
-  extensions: createProtocolExtensions({ onChoose: openResourcePicker, onNavigate: navigateAnchor }, openAppGamePicker),
+  extensions: createProtocolExtensions({ onChoose: openResourcePicker, onNavigate: navigateAnchor }, {
+    onChoose: openAppGamePicker,
+    isReadonly: () => isReadonly.value,
+    resolveLink: (item, kind) => {
+      try { return props.resolveAppGameLink?.(item, kind) }
+      catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        emit('error', { source: 'appGameCard', message, errors: [message] })
+      }
+    },
+    onLinkClick: click => emit('appGameClick', click),
+  }),
   content: createEmptyDocument(),
   editable: !isReadonly.value,
   injectCSS: false,

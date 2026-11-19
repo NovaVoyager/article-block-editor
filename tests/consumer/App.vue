@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import DefaultEditor, { ArticleEditor, createEmptyDocument, validateProtocolDocument } from 'article-block-editor'
 import type { ArticleEditorExpose, ArticleEditorError, ArticleEditorProps, ProseMirrorJSON } from 'article-block-editor'
-import type { AppGameData, AppGameKind, ResourceQuestionData } from 'article-block-editor'
+import type { AppGameCardClick, AppGameData, AppGameKind, ResourceQuestionData } from 'article-block-editor'
 import 'article-block-editor/style.css'
 
 const content = ref<ProseMirrorJSON>({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '独立项目通过 npm 安装的编辑器' }] }] })
@@ -11,7 +11,14 @@ const api = ref<ArticleEditorExpose | null>(null)
 const readonly = ref(false)
 const status = ref('尚未保存')
 const changes = ref(0)
-const options: ArticleEditorProps = { height: 600 }
+const options: ArticleEditorProps = {
+  height: 600,
+  resolveAppGameLink: (item, kind) => `/${kind}/${encodeURIComponent(String(item.id))}`,
+}
+function showDestination({ href, event }: AppGameCardClick) {
+  event.preventDefault()
+  status.value = href
+}
 const catalog: Record<AppGameKind, AppGameData> = {
   app: { id: 17, name: '宿主应用', banner: '/app.jpg,/app-2.jpg' },
   game: { id: 18, name: '宿主游戏', rating: 4.2, banner: '/game.jpg' },
@@ -27,7 +34,7 @@ const onError = (error: ArticleEditorError) => { status.value = error.message }
     <label><input v-model="readonly" type="checkbox">宿主只读开关</label>
     <button @click="api?.setContent({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '宿主异步加载的新文章' }] }] })">宿主替换内容</button>
     <p role="status">{{ status }} · change {{ changes }}</p>
-    <ArticleEditor ref="api" v-model="content" v-bind="options" :readonly="readonly" @change="changes++" @save="onSave" @error="onError">
+    <ArticleEditor ref="api" v-model="content" v-bind="options" :readonly="readonly" @change="changes++" @save="onSave" @error="onError" @app-game-click="showDestination">
       <template #app-game-picker="{ kind, select }">
         <button @click="select(catalog[kind])">{{ catalog[kind].name }}</button>
       </template>

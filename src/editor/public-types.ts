@@ -1,5 +1,7 @@
 import type { ProseMirrorJSON, ValidationResult } from './types'
 
+import type { AppGameLinkResolver } from './app-game-card'
+
 export interface ImageUploadResult {
   src: string
   alt?: string
@@ -24,6 +26,8 @@ export interface ArticleEditorProps {
   showToolbar?: boolean
   showLibrary?: boolean
   showInspector?: boolean
+  /** Generate the detail URL from the saved item when rendering a card. */
+  resolveAppGameLink?: AppGameLinkResolver
   /** Upload to your own service and return a persistent image URL or image attributes. */
   uploadImage?: ImageUploadHandler
   /** Maximum size per image in bytes. Default 10 MiB. */

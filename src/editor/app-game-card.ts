@@ -15,6 +15,16 @@ export interface AppGameData {
   banner?: string
 }
 
+/** Synchronous host callback. An empty result hides the detail link. */
+export type AppGameLinkResolver = (item: AppGameData, kind: AppGameKind) => string | null | undefined
+
+export interface AppGameCardClick {
+  item: AppGameData
+  kind: AppGameKind
+  href: string
+  event: MouseEvent
+}
+
 export interface AppGamePickerScope {
   kind: AppGameKind
   current: AppGameData | null

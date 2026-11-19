@@ -1181,7 +1181,10 @@
   border-radius: 9px;
   object-fit: cover;
 }
-.article-studio .app-game-choose {
+.article-studio .app-game-choose,
+.article-studio .article-editor .app-game-link {
+  display: inline-block;
+  text-decoration: none;
   margin-top: 18px;
   padding: 8px 24px;
   border: 0;
@@ -1190,7 +1193,6 @@
   color: white;
   font-weight: 600;
 }
-.article-studio .preview-mode .app-game-choose { display: none; }
 
 .article-studio .resource-question-node {
   position: relative;

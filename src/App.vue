@@ -2,7 +2,7 @@
 // Playground only: persistence and business state deliberately live outside the library.
 import { ref } from 'vue'
 import { ArticleEditor, createEmptyDocument, validateProtocolDocument } from './index'
-import type { ArticleEditorError, ArticleEditorExpose, ProseMirrorJSON } from './index'
+import type { AppGameCardClick, AppGameLinkResolver, ArticleEditorError, ArticleEditorExpose, ProseMirrorJSON } from './index'
 import { initialDocument } from './editor/modules'
 import { demoImageUpload } from './demo-image-upload'
 import DemoAppGamePicker from './components/DemoAppGamePicker.vue'
@@ -25,6 +25,14 @@ const jsonSource = ref('')
 const jsonErrors = ref<string[]>([])
 const jsonNotice = ref('')
 let applyingJson = false
+
+const demoAppGameLink: AppGameLinkResolver = (item, kind) =>
+  `/${kind === 'app' ? 'apps' : 'games'}/${encodeURIComponent(String(item.id))}`
+
+function showDemoLink({ href, event }: AppGameCardClick) {
+  event.preventDefault()
+  status.value = '卡片跳转地址：' + href
+}
 
 function loadDraft() {
   try {
@@ -143,6 +151,8 @@ function renderJson() {
       v-model="content"
       :readonly="readonly"
       :upload-image="demoImageUpload"
+      :resolve-app-game-link="demoAppGameLink"
+      @app-game-click="showDemoLink"
       :max-image-size="2 * 1024 * 1024"
       height="calc(100vh - 96px)"
       @change="changeCount++"
@@ -156,7 +166,7 @@ function renderJson() {
     </ArticleEditor>
     <section v-if="showSecond" class="playground-second">
       <h2>独立实例（数据互不影响）</h2>
-      <ArticleEditor v-model="secondContent" :height="600" :show-inspector="false" :upload-image="demoImageUpload" :max-image-size="2 * 1024 * 1024">
+      <ArticleEditor v-model="secondContent" :resolve-app-game-link="demoAppGameLink" @app-game-click="showDemoLink" :height="600" :show-inspector="false" :upload-image="demoImageUpload" :max-image-size="2 * 1024 * 1024">
         <template #app-game-picker="scope"><DemoAppGamePicker v-bind="scope" /></template>
         <template #resource-question-picker="{ current, select, cancel }"><DemoResourcePicker :current="current" @confirm="select" @cancel="cancel" /></template>
       </ArticleEditor>

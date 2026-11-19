@@ -38,6 +38,41 @@
 
 选中卡片，在属性面板「横向展示图」中点击「上传展示图」，或填写「自定义图片地址」。上传复用宿主的 `uploadImage` 回调，成功后仅替换这张卡片的横图。清空图片地址即恢复 `item.banner` 中第一个非空地址。覆盖值保存在 `attrs.displayImage`。重新选择同一条目保留覆盖值，更换条目则使用新条目的首图。
 
+### 卡片详情跳转
+
+将 `resolveAppGameLink(item, kind)` 传给 `ArticleEditor`。在预览和只读模式下，回调同步返回的地址用于「查看应用」或「查看游戏」链接，返回空值时隐藏入口。第二个参数 `kind` 为 `'app'` 或 `'game'`，可用来选择对应的详情页路由。
+
+第一个参数 `item` 是选择条目时保存的 `AppGameData` 快照。应用和游戏共用以下字段。
+
+| 字段 | 类型 | 必填 | 含义与示例 |
+| --- | --- | --- | --- |
+| `id` | `string` 或 `number` | 是 | 条目 ID，支持含非空白字符的字符串或整数，例如 `42` |
+| `name` | `string` | 是 | 应用或游戏名称，例如 `"星图"`，至少包含一个非空白字符 |
+| `icon` | `string` | 否 | 图标地址，例如 `"/icons/sky.png"` |
+| `category` | `string` | 否 | 分类名称，例如 `"教育"` |
+| `rating` | `number` 或 `string` | 否 | 评分，例如 `4.8` 或 `"4.8"` |
+| `version` | `string` | 否 | 版本号，例如 `"2.1"` |
+| `developer` | `string` | 否 | 开发者名称，例如 `"星图工作室"` |
+| `banner` | `string` | 否 | 数据源中的原始横图地址，多张用英文逗号分隔，例如 `"/sky-wide.jpg,/sky-night.jpg"` |
+
+下面的回调会将 ID 为 `42` 的应用链接到 `/apps/42`，同一 ID 的游戏链接到 `/games/42`。
+
+```vue
+<script setup lang="ts">
+import { ArticleEditor, type AppGameLinkResolver, type ProseMirrorJSON } from '@nova_voyager/article-block-editor'
+
+defineProps<{ article: ProseMirrorJSON }>()
+const resolveAppGameLink: AppGameLinkResolver = (item, kind) =>
+  `/${kind === 'app' ? 'apps' : 'games'}/${encodeURIComponent(String(item.id))}`
+</script>
+
+<template>
+  <ArticleEditor :model-value="article" readonly :resolve-app-game-link="resolveAppGameLink" />
+</template>
+```
+
+链接默认在当前页打开。需要交给业务路由时，监听 `@app-game-click`，在回调中调用 `event.preventDefault()`，再调用 `router.push(href)`。事件同时提供 `item` 和 `kind`。独立渲染器可以从 `appGameCard.attrs` 取出这两个字段，复用同一个链接生成函数。
+
 ## 本地开发 / 测试入口
 
 需要 Node.js 22.12+：
@@ -124,6 +159,7 @@ function onError(error: ArticleEditorError) {
 | `showToolbar` | `boolean` | `true` |
 | `showLibrary` | `boolean` | `true` |
 | `showInspector` | `boolean` | `true` |
+| `resolveAppGameLink` | `AppGameLinkResolver` | 根据 `(item, kind)` 生成卡片详情链接 |
 | `uploadImage` | `ImageUploadHandler` | 未配置；宿主提供图片上传方法，未配置时上传按钮禁用，URL 输入仍可使用 |
 | `maxImageSize` | `number` | `10485760`（10 MB）；单张图片大小上限，单位为字节，必须为正数 |
 
@@ -132,6 +168,7 @@ function onError(error: ArticleEditorError) {
 | `update:modelValue` | `ProseMirrorJSON` | 编辑或 ref 方法改变内容时返回独立快照，供 v-model 使用 |
 | `change` | `ProseMirrorJSON` | 同上；父组件回传或通过 modelValue 加载文档不循环触发 |
 | `save` | `ProseMirrorJSON` | 用户点击保存、无待上传图片且校验通过，不代表后端保存成功 |
+| `app-game-click` | `AppGameCardClick` | 点击详情链接时触发，含 `item`、`kind`、`href` 和原生 `event` |
 | `ready` | `ArticleEditorExpose` | 初始化完成，可以调用 ref 方法 |
 | `validation` | `{ valid, errors }` | 当前文档协议校验结果 |
 | `error` | `{ source, message, errors, fileName? }` | 校验/导入/上传/协议下载失败；source 为 modelValue、setContent、json、save、upload 或 protocol；上传错误包含 fileName |
