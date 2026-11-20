@@ -26,6 +26,16 @@
             "banner": { "type": "string" }
           }
         },
+        "labels": {
+          "type": "object",
+          "description": "Per-card label overrides. Each omitted key inherits the host label, then the English default (Rating, Version, Developer).",
+          "additionalProperties": false,
+          "properties": {
+            "rating": { "type": "string", "pattern": "\\S" },
+            "version": { "type": "string", "pattern": "\\S" },
+            "developer": { "type": "string", "pattern": "\\S" }
+          }
+        },
         "displayImage": { "type": "string", "pattern": "\\S", "description": "Optional replacement for the first nonempty URL in item.banner (comma-separated)." }
       }
     }

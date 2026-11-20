@@ -1,10 +1,11 @@
 import { Node } from '@tiptap/core'
 import { DOMSerializer, type DOMOutputSpec } from '@tiptap/pm/model'
-import { watchEffect } from 'vue'
-import { appGameAttrs, firstBanner, kindLabels, validAppGameCard, type AppGameCardAttrs, type AppGameCardClick, type AppGameKind, type AppGameLinkResolver } from './app-game-card'
+import { watch, watchEffect } from 'vue'
+import { appGameAttrs, firstBanner, kindLabels, resolveAppGameCardLabels, validAppGameCard, type AppGameCardAttrs, type AppGameCardClick, type AppGameCardLabels, type AppGameKind, type AppGameLinkResolver } from './app-game-card'
 
 export interface AppGameCardOptions {
   onChoose?: (getPos: () => number | undefined) => void
+  getLabels?: () => AppGameCardLabels | undefined
   isReadonly?: () => boolean
   resolveLink?: AppGameLinkResolver
   onLinkClick?: (click: AppGameCardClick) => void
@@ -26,7 +27,9 @@ function linkMarkup(kind: AppGameKind, href?: string): DOMOutputSpec {
   return ['a', { class: 'app-game-link', href }, '查看' + kindLabels[kind]]
 }
 
-function cardMarkup(attrs: AppGameCardAttrs, href?: string): DOMOutputSpec {
+const detailFields = ['rating', 'version', 'developer'] as const
+
+function cardMarkup(attrs: AppGameCardAttrs, labels: Required<AppGameCardLabels>, href?: string): DOMOutputSpec {
   const { item, kind, displayImage } = attrs
   const label = kindLabels[kind]
   const banner = displayImage || firstBanner(item?.banner)
@@ -39,11 +42,12 @@ function cardMarkup(attrs: AppGameCardAttrs, href?: string): DOMOutputSpec {
   const info: DOMOutputSpec[] = [['div', { class: 'app-game-heading' }, ...heading]]
   if (item) {
     const details: DOMOutputSpec[] = []
-    for (const [name, value] of [['评分', item.rating], ['版本', item.version], ['开发者', item.developer]] as const) {
+    for (const field of detailFields) {
+      const value = item[field]
       const hasValue = value != null && value !== ''
       const content: (string | DOMOutputSpec)[] = [hasValue ? String(value) : '—']
-      if (name === '评分' && hasValue) content.push(['span', { class: 'app-game-star', 'aria-hidden': 'true' }, '★'])
-      details.push(['div', {}, ['dt', {}, name], ['dd', {}, ...content]])
+      if (field === 'rating' && hasValue) content.push(['span', { class: 'app-game-star', 'aria-hidden': 'true' }, '★'])
+      details.push(['div', {}, ['dt', {}, labels[field]], ['dd', {}, ...content]])
     }
     info.push(['dl', { class: 'app-game-details' }, ...details])
   }
@@ -66,6 +70,7 @@ export const ProtocolAppGameCard = Node.create<AppGameCardOptions>({
     kind: { default: 'app', rendered: false, parseHTML: () => null },
     item: { default: null, rendered: false, parseHTML: () => null },
     displayImage: { default: null, rendered: false, parseHTML: () => null },
+    labels: { default: null, rendered: false, parseHTML: () => null },
   }),
   parseHTML() {
     return [{ tag: 'section[data-app-game-card]', getAttrs: element => {
@@ -77,13 +82,18 @@ export const ProtocolAppGameCard = Node.create<AppGameCardOptions>({
   },
   renderHTML({ node }) {
     const attrs = node.attrs as AppGameCardAttrs
-    return cardMarkup(attrs, cardHref(attrs, this.options.resolveLink))
+    return cardMarkup(attrs, resolveAppGameCardLabels(this.options.getLabels?.(), attrs.labels), cardHref(attrs, this.options.resolveLink))
   },
   addNodeView() {
     return ({ node, editor, view, getPos }) => {
       const attrs = node.attrs as AppGameCardAttrs
       const doc = view.dom.ownerDocument
-      const dom = DOMSerializer.renderSpec(doc, cardMarkup(attrs)).dom as HTMLElement
+      const readLabels = () => resolveAppGameCardLabels(this.options.getLabels?.(), attrs.labels)
+      const dom = DOMSerializer.renderSpec(doc, cardMarkup(attrs, readLabels())).dom as HTMLElement
+      const terms = dom.querySelectorAll('.app-game-details dt')
+      const stopLabels = watch(readLabels, labels => {
+        terms.forEach((term, index) => { term.textContent = labels[detailFields[index]!] })
+      })
       const choose = doc.createElement('button')
       choose.type = 'button'
       choose.className = 'app-game-choose'
@@ -114,7 +124,11 @@ export const ProtocolAppGameCard = Node.create<AppGameCardOptions>({
           link.remove()
         }
       })
-      return { dom, stopEvent: event => event.target === choose || event.target === link, destroy: stop }
+      return {
+        dom,
+        stopEvent: event => event.target === choose || event.target === link,
+        destroy() { stopLabels(); stop() },
+      }
     }
   },
 })

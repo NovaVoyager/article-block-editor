@@ -13,7 +13,7 @@ import {
 } from '@lucide/vue'
 import type { SelectedNode } from '../editor/types'
 import type { TableCommand, TableContext } from '../editor/table'
-import { firstBanner, kindLabels, type AppGameCardAttrs } from '../editor/app-game-card'
+import { firstBanner, kindLabels, resolveAppGameCardLabels, type AppGameCardAttrs, type AppGameCardLabels } from '../editor/app-game-card'
 import { normalizeFontSize } from '../editor/font-size'
 import { normalizeImageLayout } from '../editor/image-layout'
 import ImageFilePicker from './ImageFilePicker.vue'
@@ -29,6 +29,7 @@ const props = defineProps<{
   uploading?: boolean
   canPairNextImage?: boolean
   paragraphTargets?: ParagraphTarget[]
+  appGameCardLabels?: AppGameCardLabels
 }>()
 
 const emit = defineEmits<{
@@ -65,6 +66,8 @@ const names: Record<string, string> = {
 const type = computed(() => props.selected?.node.type.name ?? '')
 const attrs = computed<Record<string, unknown>>(() => props.selected?.node.attrs ?? {})
 const card = computed(() => attrs.value as unknown as AppGameCardAttrs)
+const cardLabelTitles = { rating: '评分标签', version: '版本标签', developer: '开发者标签' }
+const inheritedCardLabels = computed(() => resolveAppGameCardLabels(props.appGameCardLabels))
 const presetFontSizes = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96]
 const fontSizeOptions = computed(() => {
   const current = normalizeFontSize(attrs.value.fontSize)
@@ -87,6 +90,17 @@ function textPatch(key: string, event: Event) {
 function optionalTextPatch(key: string, event: Event) {
   const value = (event.target as HTMLInputElement).value
   emit('patch', { [key]: value || null })
+}
+
+function patchCardLabel(field: keyof AppGameCardLabels, event: Event) {
+  const input = event.target as HTMLInputElement
+  const value = input.value.trim()
+  input.value = value
+  const labels = { ...card.value.labels }
+  if (value === (labels[field] ?? '')) return
+  if (value) labels[field] = value
+  else delete labels[field]
+  emit('patch', { labels: Object.keys(labels).length ? labels : null })
 }
 
 function numberPatch(key: string, event: Event) {
@@ -264,6 +278,16 @@ function setButtonStyle(event: Event) {
           <span>说明标题</span>
           <input :value="attrs.title" type="text" placeholder="可选" @change="optionalTextPatch('title', $event)" />
         </label>
+      </section>
+
+      <section v-if="type === 'appGameCard'" class="property-section">
+        <h3>字段标签</h3>
+        <label v-for="(title, field) in cardLabelTitles" :key="field" class="field-label">
+          <span>{{ title }}</span>
+          <input type="text" :value="card.labels?.[field] ?? ''" :placeholder="inheritedCardLabels[field]"
+            :disabled="readonly" @change="patchCardLabel(field, $event)" />
+        </label>
+        <p class="image-upload-help">只修改这张卡片的标签。留空时使用编辑器设置的文案，默认使用英文。</p>
       </section>
 
       <section v-if="type === 'appGameCard'" class="property-section">

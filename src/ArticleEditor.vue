@@ -85,6 +85,7 @@ let applyingExternal = false
 const editor = useEditor({
   extensions: createProtocolExtensions({ onChoose: openResourcePicker, onNavigate: navigateAnchor }, {
     onChoose: openAppGamePicker,
+    getLabels: () => props.appGameCardLabels,
     isReadonly: () => isReadonly.value,
     resolveLink: (item, kind) => {
       try { return props.resolveAppGameLink?.(item, kind) }
@@ -331,6 +332,11 @@ function patchSelectedNode(attributes: Record<string, unknown>) {
     editor.value.view.dispatch(tr)
     return
   }
+  if (selected.value.node.type.name === 'appGameCard' && 'labels' in attributes) {
+    const tr = closeHistory(editor.value.state.tr).setNodeAttribute(selected.value.pos, 'labels', attributes.labels)
+    editor.value.view.dispatch(tr)
+    return
+  }
   updateNodeAttrs(editor.value, selected.value, attributes)
 }
 
@@ -364,7 +370,7 @@ function openAppGamePicker(getPos: () => number | undefined) {
         const item = snapshotAppGame(data)
         const displayImage = !attrs.item || attrs.item.id === item.id ? attrs.displayImage : null
         closePickers()
-        currentEditor.view.dispatch(closeHistory(currentEditor.state.tr).setNodeMarkup(at, undefined, { kind: attrs.kind, item, displayImage }))
+        currentEditor.view.dispatch(closeHistory(currentEditor.state.tr).setNodeMarkup(at, undefined, { ...attrs, item, displayImage }))
         return true
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
@@ -658,6 +664,7 @@ defineExpose(api)
       <InspectorPanel
         v-if="showInspector"
         :selected="selected"
+        :app-game-card-labels="appGameCardLabels"
         :table="selectedTable"
         :readonly="isReadonly"
         :top-level-count="topLevelCount"

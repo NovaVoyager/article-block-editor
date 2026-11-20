@@ -134,6 +134,7 @@ const currentProtocol = {
     attributes: [
       { name: 'kind', type: 'string', required: true, allowedValues: ['app', 'game'] },
       { name: 'item', type: 'object', required: false, description: 'Selected catalog item. Omitted until a selection is made.' },
+      { name: 'labels', type: 'object', required: false, description: appGameCardSchema.properties.attrs.properties.labels.description },
       { name: 'displayImage', type: 'string', required: false, description: appGameCardSchema.properties.attrs.properties.displayImage.description },
     ],
     render: {

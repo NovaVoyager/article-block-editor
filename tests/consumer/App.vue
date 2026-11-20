@@ -13,6 +13,7 @@ const status = ref('尚未保存')
 const changes = ref(0)
 const options: ArticleEditorProps = {
   height: 600,
+  appGameCardLabels: { rating: 'Rating', version: 'Version', developer: 'Developer' },
   resolveAppGameLink: (item, kind) => `/${kind}/${encodeURIComponent(String(item.id))}`,
 }
 function showDestination({ href, event }: AppGameCardClick) {

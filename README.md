@@ -38,6 +38,36 @@
 
 选中卡片，在属性面板「横向展示图」中点击「上传展示图」，或填写「自定义图片地址」。上传复用宿主的 `uploadImage` 回调，成功后仅替换这张卡片的横图。清空图片地址即恢复 `item.banner` 中第一个非空地址。覆盖值保存在 `attrs.displayImage`。重新选择同一条目保留覆盖值，更换条目则使用新条目的首图。
 
+### 自定义评分、版本和开发者标签
+
+选中应用或游戏卡片，在右侧「属性设置 → 字段标签」中可以分别填写「评分标签」「版本标签」「开发者标签」。输入框的占位文字显示该项继承的文案。清空某一项后，这一项恢复继承。
+
+每项优先使用当前卡片填写的标签，其次使用宿主传入的 `:app-game-card-labels`，最后使用下表中的英文默认值。例如，当前卡片只填写「开发者标签」为「工作室」时，文章 JSON 中会保存 `attrs.labels = { "developer": "工作室" }`。更换条目会保留这张卡片的标签，评分、版本号和开发者名称仍从所选条目的 `item` 读取。
+
+| 配置键 | 默认文案 | 对应数据 |
+| --- | --- | --- |
+| `rating` | Rating | `item.rating` |
+| `version` | Version | `item.version` |
+| `developer` | Developer | `item.developer` |
+
+下面的示例由宿主传入当前语言。`locale` 从 `zh` 切换为 `en` 时，继承编辑器文案的标签会立即更新。编辑、预览、只读和 HTML 导出均按相同的优先顺序显示标签。
+
+```vue
+<script setup lang="ts">
+import { ArticleEditor, type AppGameCardLabels, type ProseMirrorJSON } from '@nova_voyager/article-block-editor'
+
+defineProps<{ article: ProseMirrorJSON; locale: 'zh' | 'en' }>()
+const labels = {
+  zh: { rating: '评分', version: '版本', developer: '开发者' },
+  en: {},
+} satisfies Record<'zh' | 'en', AppGameCardLabels>
+</script>
+
+<template>
+  <ArticleEditor :model-value="article" readonly :app-game-card-labels="labels[locale]" />
+</template>
+```
+
 ### 卡片详情跳转
 
 将 `resolveAppGameLink(item, kind)` 传给 `ArticleEditor`。在预览和只读模式下，回调同步返回的地址用于「查看应用」或「查看游戏」链接，返回空值时隐藏入口。第二个参数 `kind` 为 `'app'` 或 `'game'`，可用来选择对应的详情页路由。
@@ -159,6 +189,7 @@ function onError(error: ArticleEditorError) {
 | `showToolbar` | `boolean` | `true` |
 | `showLibrary` | `boolean` | `true` |
 | `showInspector` | `boolean` | `true` |
+| `appGameCardLabels` | `AppGameCardLabels` | 自定义 `rating`、`version`、`developer` 的显示标签，默认分别为 `Rating`、`Version`、`Developer` |
 | `resolveAppGameLink` | `AppGameLinkResolver` | 根据 `(item, kind)` 生成卡片详情链接 |
 | `uploadImage` | `ImageUploadHandler` | 未配置；宿主提供图片上传方法，未配置时上传按钮禁用，URL 输入仍可使用 |
 | `maxImageSize` | `number` | `10485760`（10 MB）；单张图片大小上限，单位为字节，必须为正数 |

@@ -38,6 +38,11 @@ async function setup(kind: AppGameKind, uploadImage?: ImageUploadHandler) {
   return { wrapper, api, editor, scope: () => picker!, open }
 }
 
+function cardLabelInput(wrapper: ReturnType<typeof mount>, title: string) {
+  const label = wrapper.findAll('.inspector-panel .field-label').find(field => field.text() === title)
+  return label!.get('input')
+}
+
 async function chooseDisplayImage(wrapper: ReturnType<typeof mount>) {
   const input = wrapper.get('input[aria-label="上传展示图文件"]')
   const file = new File(['image'], 'cover.png', { type: 'image/png' })
@@ -90,6 +95,7 @@ describe('app and game cards', () => {
     expect(api.getJSON()).toEqual(before)
     expect(wrapper.get('.top-actions .primary').attributes('disabled')).toBeDefined()
 
+    await cardLabelInput(wrapper, '版本标签').setValue('Build')
     // Move the target position and selection while the host is uploading.
     editor.view.dispatch(editor.state.tr.insert(0, editor.schema.nodes.paragraph!.create()))
     editor.commands.setTextSelection(1)
@@ -97,7 +103,7 @@ describe('app and game cards', () => {
     complete({ src: '/uploaded.png', width: 960 })
     await flushPromises()
     const card = api.getJSON().content!.find(node => node.type === 'appGameCard')!
-    expect(card.attrs).toEqual({ kind, item, displayImage: '/uploaded.png' })
+    expect(card.attrs).toEqual({ kind, item, displayImage: '/uploaded.png', labels: { version: 'Build' } })
     expect(api.getJSON().content!.some(node => node.type === 'image')).toBe(false)
     expect(wrapper.get('.app-game-banner').attributes('src')).toBe('/uploaded.png')
     expect(api.validate().valid).toBe(true)
@@ -148,6 +154,71 @@ describe('app and game cards', () => {
     api.clear()
     expect(stale.select(item)).toBe(false)
     expect(api.getJSON().content?.some(n => n.type === 'appGameCard')).toBe(false)
+  })
+
+  it.each(['app', 'game'] as const)('saves and clears individual %s labels in the inspector', async kind => {
+    const { wrapper, scope, api, editor, open } = await setup(kind)
+    scope().select(item)
+    await wrapper.setProps({ appGameCardLabels: { rating: 'Score', developer: 'Studio' } })
+    const field = (title: string) => cardLabelInput(wrapper, title)
+    const labels = () => wrapper.findAll('.app-game-details dt').map(term => term.text())
+    const card = () => api.getJSON().content!.find(node => node.type === 'appGameCard')!
+    expect(field('评分标签').attributes('placeholder')).toBe('Score')
+    expect(field('版本标签').attributes('placeholder')).toBe('Version')
+    await field('评分标签').setValue('  星级  ')
+    await field('开发者标签').setValue('发行商')
+    expect(card().attrs).toEqual({ kind, item, labels: { rating: '星级', developer: '发行商' } })
+    expect(labels()).toEqual(['星级', 'Version', '发行商'])
+    expect(api.validate().valid).toBe(true)
+
+    await open()
+    expect(scope().select({ ...item, id: 2 })).toBe(true)
+    const saved = api.getJSON()
+    api.clear()
+    expect(api.setContent(saved)).toBe(true)
+    await open()
+    scope().cancel()
+    await nextTick()
+    expect(field('评分标签').element.value).toBe('星级')
+    await wrapper.setProps({ appGameCardLabels: { rating: 'Rating (5)', version: 'Release' } })
+    expect(labels()).toEqual(['星级', 'Release', '发行商'])
+    await field('评分标签').setValue('   ')
+    expect(labels()).toEqual(['Rating (5)', 'Release', '发行商'])
+    await field('开发者标签').setValue('')
+    expect(card().attrs?.labels).toBeUndefined()
+    expect(labels()).toEqual(['Rating (5)', 'Release', 'Developer'])
+    editor.commands.undo()
+    expect(card().attrs?.labels).toEqual({ developer: '发行商' })
+  })
+
+  it.each(['app', 'game'] as const)('updates %s field labels in the editor, preview and exported HTML', async kind => {
+    const { wrapper, scope, api, editor } = await setup(kind)
+    scope().select(item)
+    await nextTick()
+    const original = api.getJSON()
+    const changes = wrapper.emitted('change')?.length
+    const labels = () => wrapper.findAll('.app-game-details dt').map(term => term.text())
+    expect(labels()).toEqual(['Rating', 'Version', 'Developer'])
+
+    const overrides = ref({ rating: '评分', version: '版本', developer: '开发者' })
+    await wrapper.setProps({ appGameCardLabels: overrides.value })
+    expect(labels()).toEqual(['评分', '版本', '开发者'])
+    expect(wrapper.get('.app-game-star').text()).toBe('★')
+
+    const preview = wrapper.findAll('.top-actions button').find(button => button.text() === '预览')!
+    await preview.trigger('click')
+    overrides.value.rating = 'Score'
+    await nextTick()
+    expect(labels()).toEqual(['Score', '版本', '开发者'])
+
+    await preview.trigger('click')
+    await wrapper.setProps({ readonly: true, appGameCardLabels: { developer: 'Studio' } })
+    expect(labels()).toEqual(['Rating', 'Version', 'Studio'])
+    const html = document.createElement('div')
+    html.innerHTML = editor.getHTML()
+    expect(Array.from(html.querySelectorAll('dt'), term => term.textContent)).toEqual(labels())
+    expect(api.getJSON()).toEqual(original)
+    expect(wrapper.emitted('change')?.length).toBe(changes)
   })
 
   it.each(['app', 'game'] as const)('resolves the %s detail link in preview and lets the host handle navigation', async kind => {
@@ -208,13 +279,14 @@ describe('app and game cards', () => {
   })
 
   it('round-trips HTML and JSON with the extended protocol', () => {
-    const doc = { type: 'doc', content: [{ type: 'appGameCard', attrs: { kind: 'game', item, displayImage: '/custom.jpg' } }] }
+    const doc = { type: 'doc', content: [{ type: 'appGameCard', attrs: { kind: 'game', item, displayImage: '/custom.jpg', labels: { version: 'Build' } } }] }
     const schema = getSchema(createProtocolExtensions())
     const fragment = DOMSerializer.fromSchema(schema).serializeFragment(schema.nodeFromJSON(doc).content)
     const html = document.createElement('div')
     html.append(fragment)
     expect(html.querySelector('.app-game-banner')?.getAttribute('src')).toBe('/custom.jpg')
     expect(html.querySelector('button')).toBeNull()
+    expect(Array.from(html.querySelectorAll('dt'), term => term.textContent)).toEqual(['Rating', 'Build', 'Developer'])
     expect(toProtocolJSON(DOMParser.fromSchema(schema).parse(html).toJSON())).toEqual(doc)
     expect(validateProtocolDocument(doc).valid).toBe(true)
     expect(validateProtocolV1Document(doc).valid).toBe(false)

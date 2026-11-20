@@ -3,6 +3,12 @@ import schema from '../protocol/app-game-card-v1.schema.json'
 
 export type AppGameKind = 'app' | 'game'
 
+export interface AppGameCardLabels {
+  rating?: string
+  version?: string
+  developer?: string
+}
+
 export interface AppGameData {
   id: string | number
   name: string
@@ -36,6 +42,15 @@ export interface AppGameCardAttrs {
   kind: AppGameKind
   item?: AppGameData | null
   displayImage?: string | null
+  labels?: AppGameCardLabels | null
+}
+
+export function resolveAppGameCardLabels(host?: AppGameCardLabels, card?: AppGameCardLabels | null): Required<AppGameCardLabels> {
+  return {
+    rating: card?.rating ?? host?.rating ?? 'Rating',
+    version: card?.version ?? host?.version ?? 'Version',
+    developer: card?.developer ?? host?.developer ?? 'Developer',
+  }
 }
 
 export const kindLabels = { app: '应用', game: '游戏' }
@@ -52,8 +67,13 @@ export function snapshotAppGame(data: AppGameData): AppGameData {
   return snapshot
 }
 
-export function appGameAttrs({ kind, item, displayImage }: AppGameCardAttrs = { kind: 'app' }) {
-  return { kind, ...(item && { item: { ...item } }), ...(displayImage && { displayImage }) }
+export function appGameAttrs({ kind, item, displayImage, labels }: AppGameCardAttrs = { kind: 'app' }) {
+  return {
+    kind,
+    ...(item && { item: { ...item } }),
+    ...(displayImage && { displayImage }),
+    ...(labels && Object.keys(labels).length > 0 && { labels: { ...labels } }),
+  }
 }
 
 export function firstBanner(banner?: string) {

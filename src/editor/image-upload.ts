@@ -78,10 +78,15 @@ export function createImageUploadManager(editor: Editor, options: {
         continue
       }
       const mapped = transaction.mapping.mapResult(job.pos, 1)
-      if (job.kind === 'appGameCard' && transaction.doc.nodeAt(mapped.pos) !== transaction.before.nodeAt(job.pos)) {
-        // A new catalog selection or manual URL takes precedence over an outstanding upload.
-        cancel(job)
-        continue
+      if (job.kind === 'appGameCard') {
+        const before = transaction.before.nodeAt(job.pos)
+        const after = transaction.doc.nodeAt(mapped.pos)
+        // Label edits preserve the upload. Replacing the item or its banner supersedes it.
+        if (mapped.deleted || after?.type.name !== 'appGameCard' || after.attrs.kind !== before?.attrs.kind
+          || after.attrs.item !== before?.attrs.item || after.attrs.displayImage !== before?.attrs.displayImage) {
+          cancel(job)
+          continue
+        }
       }
       if (mapped.deleted || (job.kind === 'replace' && transaction.doc.nodeAt(mapped.pos)?.type.name !== 'image')) {
         cancel(job)
