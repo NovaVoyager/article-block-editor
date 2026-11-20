@@ -534,9 +534,26 @@
 }
 
 .article-studio .canvas-scroll.file-drop-active { outline: 2px dashed var(--accent); outline-offset: -6px; background: var(--accent-soft); }
-.article-studio .file-drop-hint { position: sticky; top: 8px; z-index: 20; padding: 10px; border-radius: 8px; background: var(--accent); color: white; text-align: center; font-size: 12px; pointer-events: none; }
+.article-studio .file-drop-hint { position: sticky; top: 8px; z-index: 20; height: 0; pointer-events: none; }
+.article-studio .file-drop-hint > span { display: block; padding: 10px; border-radius: 8px; background: var(--accent); color: white; text-align: center; font-size: 12px; }
 .article-studio .canvas-status .image-file-picker button { min-height: 30px; padding: 0 8px; font-size: 10px; }
 .article-studio .replace-image-picker button { width: 100%; }
+.article-studio .image-dropzone { margin-bottom: 12px; }
+.article-studio .image-dropzone .action-button {
+  width: 100%;
+  min-height: 84px;
+  flex-direction: column;
+  gap: 4px;
+  border-style: dashed;
+}
+.article-studio .image-dropzone small { font-size: 11px; font-weight: 400; color: var(--muted); }
+.article-studio .image-dropzone button > *,
+.article-studio .image-dropzone button:disabled { pointer-events: none; }
+.article-studio .image-dropzone.is-dragging .action-button,
+.article-studio .image-dropzone .action-button:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
 .article-studio .image-upload-help { margin: 8px 0 12px; color: var(--muted); font-size: 10px; line-height: 1.6; }
 .article-studio .image-upload-status { margin-left: auto; color: var(--accent-dark); white-space: nowrap; }
 

@@ -50,6 +50,13 @@ async function chooseDisplayImage(wrapper: ReturnType<typeof mount>) {
   await input.trigger('change')
 }
 
+function dragFiles(target: Element, type: string, files: File[]) {
+  const event = new Event(type, { bubbles: true, cancelable: true })
+  Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'], files } })
+  target.dispatchEvent(event)
+  return event
+}
+
 describe('app and game cards', () => {
   it.each(['app', 'game'] as const)('selects a %s snapshot, overrides and restores its banner', async kind => {
     const { wrapper, scope, open, api } = await setup(kind)
@@ -83,6 +90,48 @@ describe('app and game cards', () => {
     expect(scope().select({ id: 2, name: '另一个条目' })).toBe(true)
     await nextTick()
     expect(wrapper.find('.app-game-banner').exists()).toBe(false)
+  })
+
+  it.each(['app', 'game'] as const)('accepts a banner drop in the %s inspector', async kind => {
+    const upload = vi.fn<ImageUploadHandler>().mockResolvedValue('/dropped.png')
+    const { wrapper, scope, api } = await setup(kind, upload)
+    scope().select(item)
+    await nextTick()
+    const zone = wrapper.get('.inspector-panel .image-dropzone')
+    const file = new File(['image'], 'cover.png', { type: 'image/png' })
+    expect(dragFiles(zone.element, 'dragover', []).defaultPrevented).toBe(true)
+    await nextTick()
+    expect(zone.text()).toContain('松开以上传')
+    expect(dragFiles(zone.element, 'drop', [file, file]).defaultPrevented).toBe(true)
+    await flushPromises()
+    expect(zone.text()).toContain('点击选择')
+    expect(upload).toHaveBeenCalledTimes(1)
+    expect(upload.mock.calls[0]?.[0]).toBe(file)
+    expect(api.getJSON().content!.find(n => n.type === 'appGameCard')?.attrs).toEqual({ kind, item, displayImage: '/dropped.png' })
+    expect(wrapper.find('.media-node').exists()).toBe(false)
+  })
+
+  it('replaces the banner on the card under the drop even when another card is selected', async () => {
+    const upload = vi.fn<ImageUploadHandler>().mockResolvedValue('/game.png')
+    const { wrapper, api, editor } = await setup('app', upload)
+    api.setContent({ type: 'doc', content: [
+      { type: 'appGameCard', attrs: { kind: 'app', item } },
+      { type: 'appGameCard', attrs: { kind: 'game', item } },
+    ] })
+    editor.commands.setNodeSelection(0)
+    await nextTick()
+    const file = new File(['image'], 'game.png', { type: 'image/png' })
+    const banner = () => wrapper.findAll('.app-game-banner')[1]!.element
+    dragFiles(banner(), 'dragover', [])
+    await nextTick()
+    expect(wrapper.get('.file-drop-hint').text()).toContain('替换这张卡片的展示图')
+    dragFiles(banner(), 'drop', [file])
+    await flushPromises()
+    expect(api.getJSON().content!.filter(n => n.type === 'appGameCard').map(n => n.attrs?.displayImage)).toEqual([undefined, '/game.png'])
+    expect(api.getJSON().content!.some(n => n.type === 'image')).toBe(false)
+    await wrapper.setProps({ readonly: true })
+    expect(dragFiles(banner(), 'drop', [file]).defaultPrevented).toBe(true)
+    expect(upload).toHaveBeenCalledTimes(1)
   })
 
   it.each(['app', 'game'] as const)('uploads only the %s display image and can undo it', async kind => {

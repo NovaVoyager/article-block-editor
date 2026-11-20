@@ -15,7 +15,7 @@ import { kindLabels, snapshotAppGame, type AppGameCardAttrs, type AppGameCardCli
 import { anchorHighlightKey } from './editor/anchors'
 import { closeHistory } from '@tiptap/pm/history'
 import { bindQuestionOption, findQuestion, paragraphTargets, snapshotResourceQuestion, type ParagraphTarget, type ResourceQuestionAttrs, type ResourceQuestionPickerScope } from './editor/resource-question'
-import { createImageUploadManager, DEFAULT_MAX_IMAGE_SIZE } from './editor/image-upload'
+import { createImageUploadManager, DEFAULT_MAX_IMAGE_SIZE, isFileDrag } from './editor/image-upload'
 import { nextImagePosition, pairWithNextImage } from './editor/image-layout'
 import { createProtocolExtensions } from './editor/extensions'
 import { applyTableCommand, getTableContext, type TableCommand, type TableContext } from './editor/table'
@@ -73,8 +73,9 @@ const preview = ref(false)
 const isReadonly = computed(() => props.readonly || preview.value)
 const rootStyle = computed(() => ({ height: typeof props.height === 'number' ? `${props.height}px` : props.height }))
 const dragActive = ref(false)
-const fileDragActive = ref(false)
+const fileDropTarget = ref<'article' | 'card' | null>(null)
 const uploadCount = ref(0)
+const canDropCardImage = computed(() => Boolean(props.uploadImage) && !isReadonly.value && uploadCount.value === 0)
 let imageUploads: ReturnType<typeof createImageUploadManager> | undefined
 const hoveredDragPos = ref<number | null>(null)
 const device = ref<'mobile' | 'tablet' | 'desktop'>('desktop')
@@ -141,7 +142,7 @@ watch(isReadonly, (value) => {
   if (value) {
     closePickers()
     linkOpen.value = false
-    fileDragActive.value = false
+    fileDropTarget.value = null
     imageUploads?.cancelAll()
   }
 })
@@ -261,20 +262,24 @@ function uploadQuestionImage(files: File[]) {
   void uploadManager()?.upload(files, { kind: 'resourceQuestion', questionId: selected.value.node.attrs.id })
 }
 
-function isFileDrag(event: DragEvent) {
-  return Array.from(event.dataTransfer?.types ?? []).includes('Files') || Boolean(event.dataTransfer?.files.length)
+function dropCard(event: DragEvent) {
+  return event.target instanceof Element ? event.target.closest('.app-game-card') : null
 }
 
 function handleFileDragOver(event: DragEvent) {
   if (!isFileDrag(event)) return
   event.preventDefault()
-  if (event.dataTransfer) event.dataTransfer.dropEffect = isReadonly.value ? 'none' : 'copy'
-  fileDragActive.value = !isReadonly.value
+  const card = dropCard(event)
+  // A banner replacement has no text insertion point for ProseMirror's drop cursor.
+  if (card) event.stopPropagation()
+  const enabled = card ? canDropCardImage.value : !isReadonly.value
+  fileDropTarget.value = enabled ? (card ? 'card' : 'article') : null
+  if (event.dataTransfer) event.dataTransfer.dropEffect = enabled ? 'copy' : 'none'
 }
 
 function handleFileDragLeave(event: DragEvent) {
   const area = event.currentTarget as HTMLElement
-  if (!(event.relatedTarget instanceof Node) || !area.contains(event.relatedTarget)) fileDragActive.value = false
+  if (!(event.relatedTarget instanceof Node) || !area.contains(event.relatedTarget)) fileDropTarget.value = null
 }
 
 function handleFileDrop(event: DragEvent) {
@@ -282,11 +287,19 @@ function handleFileDrop(event: DragEvent) {
   // Consume external files before ProseMirror/native browser HTML or file navigation.
   event.preventDefault()
   event.stopPropagation()
-  fileDragActive.value = false
+  fileDropTarget.value = null
   dragActive.value = false
   const currentEditor = editor.value
   if (!currentEditor || isReadonly.value) return
   const files = Array.from(event.dataTransfer?.files ?? [])
+  const card = dropCard(event)
+  if (card && currentEditor.view.dom.contains(card)) {
+    if (canDropCardImage.value) {
+      const pos = currentEditor.view.posAtDOM(card, 0, -1)
+      void uploadManager()?.upload(files, { kind: 'appGameCard', pos })
+    }
+    return
+  }
   const coordinates = currentEditor.view.posAtCoords({ left: event.clientX, top: event.clientY })
   const resolved = currentEditor.state.doc.resolve(coordinates?.pos ?? currentEditor.state.doc.content.size)
   const pos = resolved.depth > 0 ? resolved.before(1) : resolved.pos
@@ -618,13 +631,15 @@ defineExpose(api)
 
         <div
           class="canvas-scroll"
-          :class="{ 'file-drop-active': fileDragActive }"
+          :class="{ 'file-drop-active': fileDropTarget }"
           @dragover.capture="handleFileDragOver"
           @dragenter.capture="handleFileDragOver"
           @dragleave="handleFileDragLeave"
           @drop.capture="handleFileDrop"
         >
-          <div v-if="fileDragActive" class="file-drop-hint">松开以上传图片并插入文章</div>
+          <div v-if="fileDropTarget" class="file-drop-hint">
+            <span>{{ fileDropTarget === 'card' ? '松开以替换这张卡片的展示图' : '松开以上传图片并插入文章' }}</span>
+          </div>
           <div
             class="device-canvas"
             :class="[`device-${device}`, { 'drop-active': dragActive && !isReadonly, 'is-preview': isReadonly }]"

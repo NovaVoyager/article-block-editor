@@ -292,7 +292,7 @@ function setButtonStyle(event: Event) {
 
       <section v-if="type === 'appGameCard'" class="property-section">
         <h3>横向展示图</h3>
-        <ImageFilePicker label="上传展示图" :disabled="readonly || !canUpload || uploading" @files="emit('uploadImage', $event)" />
+        <ImageFilePicker label="上传展示图" dropzone :disabled="readonly || !canUpload || uploading" @files="emit('uploadImage', $event)" />
         <p v-if="!canUpload && !readonly" class="image-upload-help">宿主配置 uploadImage 后可上传展示图。</p>
         <label class="field-label">
           <span>自定义图片地址</span>

@@ -9,6 +9,10 @@ export const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image
 export const IMAGE_ACCEPT = IMAGE_MIME_TYPES.join(',')
 export const DEFAULT_MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
+export function isFileDrag(event: DragEvent) {
+  return Array.from(event.dataTransfer?.types ?? []).includes('Files') || Boolean(event.dataTransfer?.files?.length)
+}
+
 type Target = { kind: 'insert' | 'replace' | 'appGameCard'; pos: number } | { kind: 'resourceQuestion'; questionId: string }
 type Job = Target & { file: File; controller: AbortController; imageBefore?: string }
 
