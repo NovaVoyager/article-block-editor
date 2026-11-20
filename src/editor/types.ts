@@ -1,3 +1,4 @@
+import type { BusinessComponentId } from '../protocol/business-components'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 
 export interface MarkJSON {
@@ -7,6 +8,10 @@ export interface MarkJSON {
 
 export interface ProseMirrorJSON {
   type: string
+  /** Root document only. Generated on export and optional on legacy input. */
+  used_components?: BusinessComponentId[]
+  /** @deprecated Legacy input only. Use used_components for new documents. */
+  usedComponents?: BusinessComponentId[]
   attrs?: Record<string, unknown>
   content?: ProseMirrorJSON[]
   marks?: MarkJSON[]

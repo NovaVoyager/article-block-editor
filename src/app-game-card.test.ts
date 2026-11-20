@@ -287,7 +287,7 @@ describe('app and game cards', () => {
     expect(html.querySelector('.app-game-banner')?.getAttribute('src')).toBe('/custom.jpg')
     expect(html.querySelector('button')).toBeNull()
     expect(Array.from(html.querySelectorAll('dt'), term => term.textContent)).toEqual(['Rating', 'Build', 'Developer'])
-    expect(toProtocolJSON(DOMParser.fromSchema(schema).parse(html).toJSON())).toEqual(doc)
+    expect(toProtocolJSON(DOMParser.fromSchema(schema).parse(html).toJSON())).toEqual({ ...doc, used_components: ['game'] })
     expect(validateProtocolDocument(doc).valid).toBe(true)
     expect(validateProtocolV1Document(doc).valid).toBe(false)
     expect(validateProtocolDocument({ type: 'doc', content: [{ type: 'appGameCard', attrs: { kind: 'film' } }] }).valid).toBe(false)

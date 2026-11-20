@@ -8,7 +8,7 @@ import type { ArticleEditorExpose, ProseMirrorJSON } from './index'
 
 const wrappers: ReturnType<typeof mount>[] = []
 const settle = async () => { await new Promise(resolve => setTimeout(resolve, 35)); await nextTick() }
-const doc = (text: string): ProseMirrorJSON => ({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] })
+const doc = (text: string): ProseMirrorJSON => ({ type: 'doc', used_components: [], content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] })
 async function create() {
   const wrapper = mount(App, { attachTo: document.body, global: { stubs: { DragHandle: true } } })
   wrappers.push(wrapper)

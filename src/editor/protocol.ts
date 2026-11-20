@@ -1,4 +1,5 @@
 import Ajv, { type ErrorObject } from 'ajv'
+import { getUsedComponents } from '../protocol/business-components'
 import { baseDocumentSchema, currentDocumentSchema } from '../protocol/current-protocol'
 import { normalizeColor } from './text-formatting'
 import { normalizeFontSize } from './font-size'
@@ -16,7 +17,9 @@ const textAlignments = new Set(['left', 'center', 'right', 'justify'])
 const imageAlignments = new Set(['left', 'center', 'right'])
 
 export function toProtocolJSON(document: ProseMirrorJSON): ProseMirrorJSON {
-  return sanitizeNode(document)
+  const node = sanitizeNode(document)
+  if (node.type === 'doc') node.used_components = getUsedComponents(node)
+  return node
 }
 
 export function validateProtocolDocument(document: ProseMirrorJSON): ValidationResult {

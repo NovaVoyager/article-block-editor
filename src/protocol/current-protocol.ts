@@ -1,3 +1,4 @@
+import { businessComponents } from './business-components'
 import protocolDefinition from './article-content-protocol-v1.json'
 import textFormattingSchema from './text-formatting-v1.schema.json'
 import fontSizeSchema from './paragraph-font-size-v1.schema.json'
@@ -10,6 +11,11 @@ import appGameCardSchema from './app-game-card-v1.schema.json'
 const anchorSchema = { type: 'string', minLength: 1, pattern: '\\S', description: 'Stable paragraph/heading anchor, unique within the article. New resource option bindings use the external option ID; existing anchors remain valid.' }
 const anchorAttribute = { name: 'anchorId', type: 'string', required: false, description: anchorSchema.description }
 
+const componentListSchema = {
+  type: 'array', uniqueItems: true, readOnly: true,
+  items: { type: 'string', enum: businessComponents.map(component => component.id) },
+}
+
 export const baseDocumentSchema = protocolDefinition.documentSchema
 
 // The validator and downloadable protocol share this exact schema.
@@ -19,6 +25,11 @@ export const currentDocumentSchema = {
   title: 'Article Content Protocol v1 + Extensions',
   properties: {
     ...baseDocumentSchema.properties,
+    usedComponents: { ...componentListSchema, deprecated: true, description: 'Legacy input alias for used_components.' },
+    used_components: {
+      ...componentListSchema,
+      description: 'Derived from content in depth-first, first-appearance order. Each business component ID occurs once. Exports include an empty array when none are used. Older documents may omit this field.',
+    },
     content: { type: 'array', items: { oneOf: [
       { $ref: '#/definitions/blockNode' }, { $ref: '#/definitions/resourceQuestion' },
     ] } },
@@ -77,7 +88,9 @@ const currentProtocol = {
   id: 'article-content-v1-with-extensions',
   name: currentDocumentSchema.title,
   baseProtocol: { id: protocolDefinition.id, version: protocolDefinition.version },
+  businessComponents,
   extensions: [
+    { id: 'used-components', version: 1 },
     { id: 'text-formatting', version: 1, schemaId: textFormattingSchema.$id },
     { id: 'paragraph-font-size', version: 1, schemaId: fontSizeSchema.$id },
     { id: 'image-layout', version: 1, schemaId: imageLayoutSchema.$id },

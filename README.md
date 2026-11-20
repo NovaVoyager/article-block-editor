@@ -103,6 +103,47 @@ const resolveAppGameLink: AppGameLinkResolver = (item, kind) =>
 
 链接默认在当前页打开。需要交给业务路由时，监听 `@app-game-click`，在回调中调用 `event.preventDefault()`，再调用 `router.push(href)`。事件同时提供 `item` 和 `kind`。独立渲染器可以从 `appGameCard.attrs` 取出这两个字段，复用同一个链接生成函数。
 
+### 自定义卡片样式
+
+**使用独立渲染器时**，在文章 JSON 中遇到 `type: "appGameCard"` 节点，就可以用业务侧的组件渲染卡片，自行决定布局和样式。应用和游戏共用这个节点，可以将 `attrs.kind` 绑定到自定义卡片根元素的 `data-kind` 属性，再分别设置边框颜色。
+
+```css
+.catalog-card[data-kind="app"] { border-left: 4px solid #2563eb; }
+.catalog-card[data-kind="game"] { border-left: 4px solid #7c3aed; }
+```
+
+这里的 `.catalog-card` 是业务组件自己的类名。卡片内容取自 `attrs.item`。展示图优先使用 `attrs.displayImage`，留空时将 `attrs.item?.banner` 按逗号拆分，取去除首尾空白后的第一个非空地址。三个字段标签按「当前卡片 → 业务端传入的文案 → 英文默认值」逐项取值，见[自定义评分、版本和开发者标签](#自定义评分版本和开发者标签)。
+
+**使用 `<ArticleEditor readonly>` 时**，可以直接覆盖内置卡片的 CSS。下面的 Vue 示例用外层容器限定范围，通过 `:deep()` 调整当前页面的卡片圆角和图标尺寸。
+
+```vue
+<script setup lang="ts">
+import { ArticleEditor, type ProseMirrorJSON } from '@nova_voyager/article-block-editor'
+import '@nova_voyager/article-block-editor/style.css'
+
+defineProps<{ article: ProseMirrorJSON }>()
+</script>
+
+<template>
+  <div class="article-page">
+    <ArticleEditor :model-value="article" readonly />
+  </div>
+</template>
+
+<style scoped>
+.article-page :deep(.app-game-card) {
+  border-radius: 20px;
+}
+
+.article-page :deep(.app-game-icon) {
+  width: 48px;
+  height: 48px;
+}
+</style>
+```
+
+同样可以用 `.app-game-banner` 调整横向展示图，用 `.app-game-details` 调整评分、版本和开发者区域，用 `.app-game-link` 调整配置了跳转地址后的详情链接。
+
 ## 本地开发 / 测试入口
 
 需要 Node.js 22.12+：
@@ -304,6 +345,42 @@ type ImageUploadHandler = (file: File, context: ImageUploadContext) => Promise<s
 
 Vue 是 peer dependency，不打进包；Tiptap/ProseMirror 等运行时依赖由 npm 安装。Tiptap 固定为验证过的 3.31.3，升级时应一起升级并执行全部测试。
 
+## 读取文章使用的业务组件
+
+文章 JSON 根节点的 `used_components` 列出当前文章实际使用的业务组件。数组按组件在正文中首次出现的顺序排列，包括嵌套块中的组件。同一种组件出现多次只记录一次。没有使用业务组件时，文章 JSON 仍包含 `"used_components": []`，包括空文章和仅有普通段落、图片或表格的文章。
+
+| 标识 | 业务组件 | 对应协议节点 |
+| --- | --- | --- |
+| `articleButton` | 文章按钮 | `articleButton` |
+| `resourceQuestion` | 资源问题 | `resourceQuestion` |
+| `app` | 应用卡片 | `appGameCard`，`attrs.kind` 为 `app` |
+| `game` | 游戏卡片 | `appGameCard`，`attrs.kind` 为 `game` |
+
+例如，下面的文章有三张卡片，渲染端可以从 `used_components` 直接判断要加载哪两类组件。
+
+```json
+{
+  "type": "doc",
+  "used_components": ["app", "game"],
+  "content": [
+    { "type": "appGameCard", "attrs": { "kind": "app" } },
+    { "type": "appGameCard", "attrs": { "kind": "app" } },
+    { "type": "appGameCard", "attrs": { "kind": "game" } }
+  ]
+}
+```
+
+`getJSON()`、`v-model` 的更新事件、`change`、`save` 和文章 JSON 导出都会根据正文生成清单。编辑、删除或撤销组件后，下一份快照会反映最新内容。下载协议定义或调用 `getCurrentProtocol()` 时，可以在 `businessComponents` 中查到全部标识及对应的节点类型。
+
+带有旧字段 `usedComponents` 或省略清单的文章都可以直接加载。再次导出时，编辑器会根据正文生成 `used_components`。独立渲染器读取历史数据时，可以用 `getUsedComponents(article)` 补算清单。业务端直接改写 `content` 后也可以调用它重新统计。
+
+```ts
+import { getUsedComponents } from '@nova_voyager/article-block-editor'
+
+const used = article.used_components ?? getUsedComponents(article)
+const hasGameCard = used.includes('game')
+```
+
 ## 协议兼容
 
 原始 `src/protocol/article-content-protocol-v1.json` 保持不变：根节点不添加 schemaVersion，普通块不添加通用 id，按钮 attrs.id 仍是业务 ID。导出清理 Tiptap 内部属性，tableHeader 转换为 tableCell。
@@ -318,7 +395,7 @@ Vue 是 peer dependency，不打进包；Tiptap/ProseMirror 等运行时依赖�
 import { toProtocolJSON, validateProtocolDocument, validateProtocolV1Document } from '@nova_voyager/article-block-editor'
 ```
 
-`validateProtocolDocument` 支持 v1 + 颜色 / 正文字号 / 图片排版扩展；`validateProtocolV1Document` 仅检查原始 v1。`toProtocolJSON` 用于规范化编辑器输出，不代替输入校验。
+`validateProtocolDocument` 接受当前协议及省略 `used_components` 的旧文章。`validateProtocolV1Document` 严格检查原始 v1。对接只接受原始 v1 的系统时，需先移除根字段 `used_components`，再校验正文是否仅使用 v1 支持的节点与属性。`toProtocolJSON` 用于规范化编辑器输出，不代替输入校验。
 
 ## npm 发布
 

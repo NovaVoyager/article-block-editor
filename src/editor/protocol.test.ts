@@ -3,7 +3,8 @@ import { getSchema } from '@tiptap/core'
 import { EditorState } from '@tiptap/pm/state'
 import { history, undo, redo } from '@tiptap/pm/history'
 import { createProtocolExtensions } from './extensions'
-import { initialDocument } from './modules'
+import { editorModules, initialDocument } from './modules'
+import { getUsedComponents } from '../protocol/business-components'
 import { toProtocolJSON, validateProtocolDocument, validateProtocolV1Document } from './protocol'
 import { normalizeColor } from './text-formatting'
 import { normalizeFontSize } from './font-size'
@@ -13,7 +14,23 @@ describe('Article Content Protocol v1 adapter', () => {
   it('keeps the starter document strictly valid', () => {
     const document = toProtocolJSON(initialDocument)
     expect(validateProtocolDocument(document)).toEqual({ valid: true, errors: [] })
-    expect(validateProtocolV1Document(document).valid).toBe(true)
+    expect(document.used_components).toEqual(['articleButton'])
+    expect(validateProtocolV1Document(document).valid).toBe(false)
+    expect(validateProtocolV1Document(initialDocument).valid).toBe(true)
+  })
+
+  it('collects only business components in document order, including nested and repeated cards', () => {
+    const make = (id: string) => editorModules.find(module => module.type === id)!.create()
+    const input: ProseMirrorJSON = { type: 'doc', content: [
+      { type: 'blockquote', content: [make('game'), make('articleButton')] },
+      make('image'), make('resourceQuestion'), make('app'), make('game'), make('articleButton'),
+    ] }
+    expect(validateProtocolDocument(input).valid).toBe(true)
+    const expected = ['game', 'articleButton', 'resourceQuestion', 'app']
+    expect(getUsedComponents(input)).toEqual(expected)
+    expect(toProtocolJSON({ ...input, used_components: [] }).used_components).toEqual(expected)
+    expect(input.used_components).toBeUndefined()
+    expect(toProtocolJSON(make('app')).used_components).toBeUndefined()
   })
 
   it('removes Tiptap defaults and protocol-external attributes', () => {
@@ -43,7 +60,7 @@ describe('Article Content Protocol v1 adapter', () => {
 
     const protocolDocument = toProtocolJSON(tiptapDocument)
     expect(protocolDocument).toEqual({
-      type: 'doc',
+      type: 'doc', used_components: [],
       content: [
         { type: 'paragraph', content: [{ type: 'text', text: '正文' }] },
         {
@@ -167,7 +184,7 @@ describe('Text formatting persistence', () => {
     expect(toProtocolJSON(loaded.toJSON())).toEqual(saved)
     expect(saved.content?.[0].content?.[0].marks).toEqual(expect.arrayContaining(coloredDocument.content![0]!.content![0]!.marks!))
     expect(validateProtocolDocument(saved).valid).toBe(true)
-    expect(validateProtocolV1Document(saved).valid).toBe(false)
+    expect(validateProtocolV1Document({ type: 'doc', content: saved.content }).valid).toBe(false)
   })
 
   it('undoes and redoes color changes without losing the text', () => {
@@ -198,7 +215,7 @@ describe('Text formatting persistence', () => {
     expect(normalizeColor('#ABC')).toBe('#aabbcc')
     const document = structuredClone(coloredDocument)
     document.content![0]!.content![0]!.marks![0]!.attrs!.color = 'rgb(220, 38, 38)'
-    expect(toProtocolJSON(document)).toEqual(coloredDocument)
+    expect(toProtocolJSON(document)).toEqual({ ...coloredDocument, used_components: [] })
   })
 })
 
@@ -217,7 +234,7 @@ describe('Paragraph font size extension', () => {
     const saved = toProtocolJSON(node.toJSON())
     expect(saved.content?.[0]?.attrs).toEqual(paragraph.attrs)
     expect(validateProtocolDocument(saved).valid).toBe(true)
-    expect(validateProtocolV1Document(saved).valid).toBe(false)
+    expect(validateProtocolV1Document({ type: 'doc', content: saved.content }).valid).toBe(false)
     expect(toProtocolJSON(schema.nodeFromJSON(JSON.parse(JSON.stringify(saved))).toJSON())).toEqual(saved)
   })
 
@@ -245,6 +262,6 @@ describe('Paragraph font size extension', () => {
     expect(normalizeFontSize(96)).toBe(96)
     const value = toProtocolJSON(schema.nodeFromJSON({ type: 'doc', content: [{ type: 'paragraph' }] }).toJSON())
     expect(value.content?.[0]?.attrs?.fontSize).toBeUndefined()
-    expect(validateProtocolV1Document(value).valid).toBe(true)
+    expect(validateProtocolV1Document({ type: 'doc', content: value.content }).valid).toBe(true)
   })
 })

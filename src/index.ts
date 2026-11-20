@@ -1,6 +1,7 @@
 export { default as ArticleEditor } from './ArticleEditor.vue'
 export { default } from './ArticleEditor.vue'
 export { createEmptyDocument } from './editor/document'
+export { getUsedComponents, type BusinessComponentId } from './protocol/business-components'
 export { getCurrentProtocol } from './protocol/current-protocol'
 export { toProtocolJSON, validateProtocolDocument, validateProtocolV1Document } from './editor/protocol'
 export type { ArticleEditorProps, ArticleEditorExpose, ArticleEditorError } from './editor/public-types'

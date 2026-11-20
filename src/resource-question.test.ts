@@ -17,7 +17,7 @@ import { getCurrentProtocol } from './protocol/current-protocol'
 
 const data: ResourceQuestionData = { resourceId: 'sleep', title: '入睡时间？', description: '请选择', options: [{ id: 'fast', label: '5分钟以内' }, { id: 'slow', label: '30分钟以上' }] }
 const question = (): ProseMirrorJSON => ({ type: 'resourceQuestion', attrs: { id: 'q1', ...structuredClone(data), hideFollowing: false, revealKey: 'unlock-q1' } })
-const article = (): ProseMirrorJSON => ({ type: 'doc', content: [question(), { type: 'paragraph', content: [{ type: 'text', text: '目标段落' }] }, { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: '另一目标' }] }] })
+const article = (): ProseMirrorJSON => ({ type: 'doc', used_components: ['resourceQuestion'], content: [question(), { type: 'paragraph', content: [{ type: 'text', text: '目标段落' }] }, { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: '另一目标' }] }] })
 const wrappers: ReturnType<typeof mount>[] = []
 const editors: Editor[] = []
 const settle = async () => { await new Promise(resolve => setTimeout(resolve, 35)); await nextTick() }
@@ -50,11 +50,11 @@ async function component(props: ArticleEditorProps = { modelValue: article() }) 
 describe('resource snapshots and protocol', () => {
   it('accepts new nodes, preserves old v1, and updates the offline downloadable schema', () => {
     expect(validateProtocolDocument(article()).valid).toBe(true)
-    expect(validateProtocolV1Document(article()).valid).toBe(false)
+    expect(validateProtocolV1Document({ type: 'doc', content: article().content }).valid).toBe(false)
     const old = { type: 'doc', content: [{ type: 'paragraph' }] }
     expect(validateProtocolV1Document(old).valid).toBe(true)
     expect(validateProtocolDocument(old).valid).toBe(true)
-    expect(toProtocolJSON(old)).toEqual(old)
+    expect(toProtocolJSON(old)).toEqual({ ...old, used_components: [] })
     const protocol = getCurrentProtocol()
     expect(protocol.nodes.some(node => node.type === 'resourceQuestion')).toBe(true)
     expect(protocol.nodes.find(node => node.type === 'heading')?.attributes.some(attr => attr.name === 'anchorId')).toBe(true)

@@ -44,7 +44,7 @@ function expectSize(api: ArticleEditorExpose, rows: number, columns: number, tab
   const current = api.getJSON().content!.filter(node => node.type === 'table')[tableIndex]!
   expect(current.content).toHaveLength(rows)
   expect(current.content!.every(row => row.content?.length === columns)).toBe(true)
-  expect(validateProtocolV1Document(api.getJSON()).valid).toBe(true)
+  expect(validateProtocolV1Document({ type: 'doc', content: api.getJSON().content }).valid).toBe(true)
 }
 
 beforeEach(() => {

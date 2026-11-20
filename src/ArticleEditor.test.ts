@@ -83,6 +83,29 @@ describe('ArticleEditor public component contract', () => {
     expect(wrapper.find('button[title="撤销"]').attributes('disabled')).toBeDefined()
   })
 
+  it('rebuilds the component list on import, edit, undo, redo and save', async () => {
+    const { wrapper, api } = await create({ modelValue: {
+      type: 'doc', usedComponents: ['resourceQuestion'], content: [{ type: 'appGameCard', attrs: { kind: 'app' } }],
+    } })
+    expect(api.getJSON().used_components).toEqual(['app'])
+    await wrapper.findAll('.module-card').find(button => button.find('strong').text() === '游戏卡片')!.trigger('click')
+    await settle()
+    const edited = api.getJSON()
+    expect(edited).not.toHaveProperty('usedComponents')
+    // The initial selection is the only node, so inserting the game replaces the app.
+    expect(edited.used_components).toEqual(['game'])
+    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toEqual(edited)
+    expect(wrapper.emitted('change')?.at(-1)?.[0]).toEqual(edited)
+    await wrapper.find('button[title="撤销"]').trigger('click')
+    expect(api.getJSON().used_components).toEqual(['app'])
+    await wrapper.find('button[title="重做"]').trigger('click')
+    expect(api.getJSON().used_components).toEqual(edited.used_components)
+    await wrapper.find('button.action-button.primary').trigger('click')
+    expect(wrapper.emitted('save')?.at(-1)?.[0]).toEqual(edited)
+    api.clear()
+    expect(api.getJSON().used_components).toEqual([])
+  })
+
   it('returns detached snapshots and supports imperative content replacement and clearing', async () => {
     const { wrapper, api } = await create()
     expect(api.setContent(documentWith('通过 ref 写入'))).toBe(true)
@@ -192,7 +215,8 @@ describe('ArticleEditor public component contract', () => {
     await button.trigger('click')
     await settle()
     expect(api.getJSON().content?.filter(node => node.type === 'articleButton')).toHaveLength(1)
-    expect(validateProtocolV1Document(api.getJSON()).valid).toBe(true)
+    expect(validateProtocolV1Document({ type: 'doc', content: api.getJSON().content }).valid).toBe(true)
+    expect(api.getJSON().used_components).toEqual(['articleButton'])
     expect(JSON.stringify(api.getJSON())).not.toContain('"group"')
     expect(wrapper.find('.article-button-node').text()).toContain('了解更多')
     await wrapper.find('button[title="撤销"]').trigger('click')
@@ -209,7 +233,7 @@ describe('ArticleEditor public component contract', () => {
     await settle()
     expect(api.getJSON().content?.filter(node => node.type === 'horizontalRule')).toEqual([{ type: 'horizontalRule' }])
     expect(wrapper.find('.article-editor').text()).toBe('分割线后的内容')
-    expect(validateProtocolV1Document(api.getJSON()).valid).toBe(true)
+    expect(validateProtocolV1Document({ type: 'doc', content: api.getJSON().content }).valid).toBe(true)
     expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toEqual(api.getJSON())
     await wrapper.find('button[title="撤销"]').trigger('click')
     await settle()
@@ -271,7 +295,7 @@ describe('ArticleEditor public component contract', () => {
     await wrapper.find('.font-size-reset').trigger('click')
     expect(api.getJSON().content?.[0]?.attrs?.fontSize).toBeUndefined()
     expect(wrapper.find('.article-editor p').attributes('style') ?? '').not.toContain('font-size')
-    expect(validateProtocolV1Document(api.getJSON()).valid).toBe(true)
+    expect(validateProtocolV1Document({ type: 'doc', content: api.getJSON().content }).valid).toBe(true)
   })
 
   it('offers preset sizes, retains an existing non-preset size, and supports the default option', async () => {

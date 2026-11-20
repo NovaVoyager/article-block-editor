@@ -67,6 +67,10 @@ describe('Current protocol download', () => {
     expect(protocol.nodes.find(node => node.type === 'image')?.attributes).toContainEqual(expect.objectContaining({ name: 'imageLayout', allowedValues: ['two-column'] }))
     expect(protocol.marks.map(mark => mark.type)).toEqual([...originalProtocol.marks.map(mark => mark.type), 'textStyle', 'highlight'])
     expect(protocol.extensions).toContainEqual(expect.objectContaining({ id: 'app-game-card' }))
+    expect(protocol.businessComponents).toEqual([
+      { id: 'articleButton', nodeType: 'articleButton' }, { id: 'resourceQuestion', nodeType: 'resourceQuestion' },
+      { id: 'app', nodeType: 'appGameCard', kind: 'app' }, { id: 'game', nodeType: 'appGameCard', kind: 'game' },
+    ])
     protocol.documentSchema.definitions.paragraph.properties.attrs.properties.fontSize.maximum = 10
     protocol.nodes[0]!.description = 'mutated'
     expect(getCurrentProtocol().documentSchema).toEqual(currentDocumentSchema)
@@ -80,7 +84,12 @@ describe('Current protocol download', () => {
     const invalidSize = { type: 'doc', content: [{ type: 'paragraph', attrs: { fontSize: 200 } }] }
     const invalidLayout = { type: 'doc', content: [{ type: 'image', attrs: { src: '/x.png', imageLayout: 'three-column' } }] }
     const invalidColor = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'highlight', attrs: { color: 'red' } }] }] }] }
-    const validDocuments = [toProtocolJSON(initialDocument), extendedDocument]
+    for (const invalid of [['image'], ['app', 'app'], 'app', null]) {
+      expect(validate({ ...extendedDocument, used_components: invalid })).toBe(false)
+      expect(validate({ ...extendedDocument, usedComponents: invalid })).toBe(false)
+    }
+    expect(validate({ type: 'doc', content: [{ type: 'paragraph', used_components: [] }] })).toBe(false)
+    const validDocuments = [toProtocolJSON(initialDocument), extendedDocument, { ...extendedDocument, usedComponents: [] }]
     for (const value of validDocuments) expect(validate(value)).toBe(true)
     for (const value of [invalidSize, invalidLayout, invalidColor, { type: 'unknown' }]) expect(validate(value)).toBe(false)
     for (const value of [...validDocuments, invalidSize, invalidLayout, invalidColor]) {

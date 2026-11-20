@@ -4,7 +4,7 @@ import { toProtocolJSON, validateProtocolDocument } from './protocol'
 import type { ProseMirrorJSON } from './types'
 
 export function createEmptyDocument(): ProseMirrorJSON {
-  return { type: 'doc', content: [{ type: 'paragraph' }] }
+  return { type: 'doc', content: [{ type: 'paragraph' }], used_components: [] }
 }
 
 /** Validate BEFORE normalization: unknown fields must not disappear silently. */

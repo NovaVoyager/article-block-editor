@@ -96,12 +96,12 @@ describe('Responsive image dimensions', () => {
 describe('Two-column image layout', () => {
   it('keeps old image documents unchanged and validates the optional layout extension separately', () => {
     const old = imagesDocument()
-    expect(toProtocolJSON(old)).toEqual(old)
+    expect(toProtocolJSON(old)).toEqual({ ...old, used_components: [] })
     expect(validateProtocolV1Document(old).valid).toBe(true)
     const paired = { type: 'doc', content: [picture('left', 'two-column'), picture('right', 'two-column')] }
     expect(validateProtocolDocument(paired).valid).toBe(true)
     expect(validateProtocolV1Document(paired).valid).toBe(false)
-    expect(toProtocolJSON(paired)).toEqual(paired)
+    expect(toProtocolJSON(paired)).toEqual({ ...paired, used_components: [] })
     for (const value of ['three-column', 'single', 'url(evil)', 2, null]) {
       const invalid = imagesDocument()
       invalid.content![0]!.attrs!.imageLayout = value
@@ -147,7 +147,7 @@ describe('Two-column image layout', () => {
     await layout.setValue('')
     expect(api.getJSON().content?.[0]?.attrs?.imageLayout).toBeUndefined()
     expect(wrapper.find('.media-node').attributes('data-image-layout')).toBeUndefined()
-    expect(validateProtocolV1Document(api.getJSON()).valid).toBe(true)
+    expect(validateProtocolV1Document({ type: 'doc', content: api.getJSON().content }).valid).toBe(true)
   })
 
   it('does not pair across body text or table cell boundaries', async () => {

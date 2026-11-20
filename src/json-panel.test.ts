@@ -1,6 +1,6 @@
 /// <reference types="node" />
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import postcss from 'postcss'
@@ -84,6 +84,28 @@ describe('JSON drawer layering and interactions', () => {
     expect(second.wrapper.find('.json-drawer').isVisible()).toBe(true)
   })
 
+  it.each([
+    { used_components: ['game'] },
+    { usedComponents: ['game'] },
+    { used_components: ['app'], usedComponents: ['game'] },
+  ])('exports a canonical component list from draft metadata %j without applying the draft', async metadata => {
+    const { wrapper, api } = await create()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', new Proxy(navigator, {
+      get(target, key) { return key === 'clipboard' ? { writeText } : Reflect.get(target, key, target) },
+    }))
+    try {
+      await openJson(wrapper)
+      const draft = { type: 'doc', content: [{ type: 'appGameCard', attrs: { kind: 'app' } }] }
+      await wrapper.get('.json-drawer textarea').setValue(JSON.stringify({ ...draft, ...metadata }))
+      await wrapper.get('.drawer-footer button').trigger('click')
+      expect(JSON.parse(writeText.mock.calls[0]![0])).toEqual({ ...draft, used_components: ['app'] })
+      expect(api.getJSON().used_components).toEqual([])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('keeps invalid JSON open and can apply corrected JSON with normally sized footer buttons', async () => {
     const { wrapper, api } = await create()
     await openJson(wrapper)
@@ -101,7 +123,7 @@ describe('JSON drawer layering and interactions', () => {
     await wrapper.find('.json-drawer textarea').setValue(JSON.stringify(changed))
     await wrapper.find('.drawer-footer .primary').trigger('click')
     expect(wrapper.find('.drawer-backdrop').exists()).toBe(false)
-    expect(api.getJSON()).toEqual(changed)
-    expect(wrapper.emitted('change')?.at(-1)?.[0]).toEqual(changed)
+    expect(api.getJSON()).toEqual({ ...changed, used_components: [] })
+    expect(wrapper.emitted('change')?.at(-1)?.[0]).toEqual(api.getJSON())
   })
 })

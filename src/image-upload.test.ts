@@ -60,7 +60,7 @@ describe('Image upload component integration', () => {
     const images = api.getJSON().content!.filter((node) => node.type === 'image')
     expect(images.map((node) => node.attrs?.src)).toEqual(['/uploads/one.png', '/uploads/two.png'])
     expect(images[0]?.attrs).toMatchObject({ width: 640, height: 480, alt: 'one.png' })
-    expect(validateProtocolV1Document(api.getJSON()).valid).toBe(true)
+    expect(validateProtocolV1Document({ type: 'doc', content: api.getJSON().content }).valid).toBe(true)
     expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toEqual(api.getJSON())
     await wrapper.find('button[title="撤销"]').trigger('click')
     await tick()

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Check, Clipboard, Download, Upload, X } from '@lucide/vue'
+import { validateProtocolDocument } from '../editor/protocol'
+import { getUsedComponents } from '../protocol/business-components'
 
 const props = defineProps<{
   open: boolean
@@ -30,9 +32,25 @@ watch(
 
 const lineCount = computed(() => draft.value.split('\n').length)
 
+function exportDraft() {
+  if (draft.value === props.value) return draft.value
+  try {
+    const document = JSON.parse(draft.value)
+    if (validateProtocolDocument(document).valid) {
+      const usedComponents = getUsedComponents(document)
+      if ('usedComponents' in document || JSON.stringify(document.used_components) !== JSON.stringify(usedComponents)) {
+        delete document.usedComponents
+        document.used_components = usedComponents
+        return JSON.stringify(document, null, 2)
+      }
+    }
+  } catch { /* Keep unfinished JSON available for copying or downloading. */ }
+  return draft.value
+}
+
 async function copyJson() {
   try {
-    await navigator.clipboard.writeText(draft.value)
+    await navigator.clipboard.writeText(exportDraft())
     copied.value = true
     copyError.value = ''
     clearTimeout(copyTimer)
@@ -43,7 +61,7 @@ async function copyJson() {
 }
 
 function downloadJson() {
-  const blob = new Blob([draft.value], { type: 'application/vnd.article-content-protocol+json' })
+  const blob = new Blob([exportDraft()], { type: 'application/vnd.article-content-protocol+json' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
